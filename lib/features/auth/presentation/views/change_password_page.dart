@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 
-import 'change_password_page.dart';
 import 'home_page.dart';
 import '../viewmodels/login_view_model.dart';
 
-class LoginPage extends StatefulWidget {
-  const LoginPage({
+class ChangePasswordPage extends StatefulWidget {
+  const ChangePasswordPage({
     super.key,
     required this.viewModel,
   });
@@ -13,48 +12,31 @@ class LoginPage extends StatefulWidget {
   final LoginViewModel viewModel;
 
   @override
-  State<LoginPage> createState() => _LoginPageState();
+  State<ChangePasswordPage> createState() => _ChangePasswordPageState();
 }
 
-class _LoginPageState extends State<LoginPage> {
-  final TextEditingController _usernameController = TextEditingController(
-    text: 'admin',
-  );
-  final TextEditingController _passwordController = TextEditingController(
-    text: 'Admin@123',
-  );
+class _ChangePasswordPageState extends State<ChangePasswordPage> {
+  final TextEditingController _newPasswordController = TextEditingController();
+  final TextEditingController _confirmPasswordController =
+      TextEditingController();
 
-  bool _obscurePassword = true;
+  bool _obscureNewPassword = true;
+  bool _obscureConfirmPassword = true;
 
   @override
   void dispose() {
-    _usernameController.dispose();
-    _passwordController.dispose();
+    _newPasswordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
   }
 
-  Future<void> _submitLogin() async {
-    final success = await widget.viewModel.login(
-      username: _usernameController.text,
-      password: _passwordController.text,
+  Future<void> _submitChangePassword() async {
+    final success = await widget.viewModel.changePassword(
+      newPassword: _newPasswordController.text,
+      confirmPassword: _confirmPasswordController.text,
     );
 
     if (!mounted || !success) {
-      return;
-    }
-
-    final user = widget.viewModel.currentUser;
-    if (user == null) {
-      return;
-    }
-
-    if (user.mustChangePassword) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (_) => ChangePasswordPage(viewModel: widget.viewModel),
-        ),
-      );
       return;
     }
 
@@ -73,6 +55,10 @@ class _LoginPageState extends State<LoginPage> {
       builder: (context, _) {
         final viewModel = widget.viewModel;
         return Scaffold(
+          appBar: AppBar(
+            title: const Text('Change password'),
+            automaticallyImplyLeading: false,
+          ),
           body: SafeArea(
             child: Center(
               child: SingleChildScrollView(
@@ -87,72 +73,80 @@ class _LoginPageState extends State<LoginPage> {
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
-                          Icon(
-                            Icons.lock_outline,
-                            size: 56,
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
-                          const SizedBox(height: 16),
                           Text(
-                            'Sign in',
-                            textAlign: TextAlign.center,
+                            'Set a new password',
                             style: Theme.of(context).textTheme.headlineSmall,
                           ),
                           const SizedBox(height: 8),
-                          Text(
-                            'IT Support Ticket Management',
-                            textAlign: TextAlign.center,
-                            style: Theme.of(context).textTheme.bodyMedium,
+                          const Text(
+                            'This account is using a temporary password.',
                           ),
                           const SizedBox(height: 24),
                           TextField(
-                            controller: _usernameController,
+                            controller: _newPasswordController,
                             enabled: !viewModel.isLoading,
-                            decoration: const InputDecoration(
-                              labelText: 'Username',
-                              prefixIcon: Icon(Icons.person_outline),
-                              border: OutlineInputBorder(),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          TextField(
-                            controller: _passwordController,
-                            enabled: !viewModel.isLoading,
-                            obscureText: _obscurePassword,
+                            obscureText: _obscureNewPassword,
                             decoration: InputDecoration(
-                              labelText: 'Password',
-                              prefixIcon: const Icon(Icons.lock_outline),
+                              labelText: 'New password',
                               border: const OutlineInputBorder(),
                               suffixIcon: IconButton(
-                                tooltip: _obscurePassword
+                                tooltip: _obscureNewPassword
                                     ? 'Show password'
                                     : 'Hide password',
                                 onPressed: () {
                                   setState(() {
-                                    _obscurePassword = !_obscurePassword;
+                                    _obscureNewPassword =
+                                        !_obscureNewPassword;
                                   });
                                 },
                                 icon: Icon(
-                                  _obscurePassword
+                                  _obscureNewPassword
                                       ? Icons.visibility_outlined
                                       : Icons.visibility_off_outlined,
                                 ),
                               ),
                             ),
-                            onSubmitted: (_) {
-                              if (!viewModel.isLoading) {
-                                _submitLogin();
-                              }
-                            },
+                          ),
+                          const SizedBox(height: 16),
+                          TextField(
+                            controller: _confirmPasswordController,
+                            enabled: !viewModel.isLoading,
+                            obscureText: _obscureConfirmPassword,
+                            decoration: InputDecoration(
+                              labelText: 'Confirm password',
+                              border: const OutlineInputBorder(),
+                              suffixIcon: IconButton(
+                                tooltip: _obscureConfirmPassword
+                                    ? 'Show password'
+                                    : 'Hide password',
+                                onPressed: () {
+                                  setState(() {
+                                    _obscureConfirmPassword =
+                                        !_obscureConfirmPassword;
+                                  });
+                                },
+                                icon: Icon(
+                                  _obscureConfirmPassword
+                                      ? Icons.visibility_outlined
+                                      : Icons.visibility_off_outlined,
+                                ),
+                              ),
+                            ),
                           ),
                           if (viewModel.errorMessage != null) ...[
                             const SizedBox(height: 16),
-                            _ErrorMessage(message: viewModel.errorMessage!),
+                            Text(
+                              viewModel.errorMessage!,
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.error,
+                              ),
+                            ),
                           ],
                           const SizedBox(height: 24),
                           FilledButton(
-                            onPressed:
-                                viewModel.isLoading ? null : _submitLogin,
+                            onPressed: viewModel.isLoading
+                                ? null
+                                : _submitChangePassword,
                             child: Padding(
                               padding: const EdgeInsets.symmetric(vertical: 14),
                               child: viewModel.isLoading
@@ -163,13 +157,8 @@ class _LoginPageState extends State<LoginPage> {
                                         strokeWidth: 2,
                                       ),
                                     )
-                                  : const Text('Sign in'),
+                                  : const Text('Save password'),
                             ),
-                          ),
-                          const SizedBox(height: 16),
-                          const Text(
-                            'Demo admin: admin / Admin@123',
-                            textAlign: TextAlign.center,
                           ),
                         ],
                       ),
@@ -181,31 +170,6 @@ class _LoginPageState extends State<LoginPage> {
           ),
         );
       },
-    );
-  }
-}
-
-class _ErrorMessage extends StatelessWidget {
-  const _ErrorMessage({
-    required this.message,
-  });
-
-  final String message;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.errorContainer,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(
-        message,
-        style: TextStyle(
-          color: Theme.of(context).colorScheme.onErrorContainer,
-        ),
-      ),
     );
   }
 }

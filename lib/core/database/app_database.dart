@@ -1,11 +1,13 @@
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 
+import '../security/password_hasher.dart';
+
 class AppDatabase {
   AppDatabase._();
 
   static const String databaseName = 'it_support.db';
-  static const int databaseVersion = 2;
+  static const int databaseVersion = 3;
 
   static const String usersTable = 'users';
   static const String departmentsTable = 'departments';
@@ -48,6 +50,7 @@ class AppDatabase {
 
   static Future<void> _onCreate(Database database, int version) async {
     await _createSchema(database);
+    await _createIndexes(database);
     await seedReferenceData(databaseOverride: database);
   }
 
@@ -60,6 +63,10 @@ class AppDatabase {
     if (oldVersion < 2) {
       await _migrateTicketsV1ToV2(database);
     }
+    if (oldVersion < 3) {
+      await _migrateUsersV2ToV3(database);
+    }
+    await _createIndexes(database);
     await seedReferenceData(databaseOverride: database);
   }
 
@@ -89,6 +96,8 @@ class AppDatabase {
         phoneNumber TEXT,
         avatarUrl TEXT,
         isActive INTEGER NOT NULL DEFAULT 1,
+        mustChangePassword INTEGER NOT NULL DEFAULT 1,
+        lastLoginAt TEXT,
         createdAt TEXT NOT NULL,
         updatedAt TEXT,
         FOREIGN KEY (departmentId) REFERENCES $departmentsTable(id)
@@ -233,6 +242,12 @@ class AppDatabase {
       )
     ''');
 
+    await batch.commit(noResult: true);
+  }
+
+  static Future<void> _createIndexes(Database database) async {
+    final batch = database.batch();
+
     batch.execute('''
       CREATE INDEX IF NOT EXISTS idx_users_role
       ON $usersTable(role)
@@ -295,6 +310,24 @@ class AppDatabase {
 
       await database.execute(
         'ALTER TABLE $ticketsTable ADD COLUMN ${entry.key} ${entry.value}',
+      );
+    }
+  }
+
+  static Future<void> _migrateUsersV2ToV3(Database database) async {
+    final existingColumns = await _getColumnNames(database, usersTable);
+    final columnsToAdd = <String, String>{
+      'mustChangePassword': 'INTEGER NOT NULL DEFAULT 1',
+      'lastLoginAt': 'TEXT',
+    };
+
+    for (final entry in columnsToAdd.entries) {
+      if (existingColumns.contains(entry.key)) {
+        continue;
+      }
+
+      await database.execute(
+        'ALTER TABLE $usersTable ADD COLUMN ${entry.key} ${entry.value}',
       );
     }
   }
@@ -419,6 +452,21 @@ class AppDatabase {
         },
         conflictAlgorithm: ConflictAlgorithm.ignore,
       );
+
+      await transaction.insert(
+        usersTable,
+        {
+          'fullName': 'System Administrator',
+          'username': 'admin',
+          'email': 'admin@example.com',
+          'passwordHash': PasswordHasher.hash('Admin@123'),
+          'role': 'admin',
+          'isActive': 1,
+          'mustChangePassword': 1,
+          'createdAt': now,
+        },
+        conflictAlgorithm: ConflictAlgorithm.ignore,
+      );
     });
   }
 
@@ -453,6 +501,7 @@ class AppDatabase {
 
     await batch.commit(noResult: true);
     await _createSchema(database);
+    await _createIndexes(database);
     await seedReferenceData(databaseOverride: database);
   }
 

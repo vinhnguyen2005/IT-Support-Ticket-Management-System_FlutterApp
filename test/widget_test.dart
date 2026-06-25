@@ -1,30 +1,56 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
-import 'package:it_ticket_support_management/main.dart';
+import 'package:it_ticket_support_management/features/auth/application/services/i_auth_service.dart';
+import 'package:it_ticket_support_management/features/auth/domain/entities/user.dart';
+import 'package:it_ticket_support_management/features/auth/presentation/viewmodels/login_view_model.dart';
+import 'package:it_ticket_support_management/features/auth/presentation/views/login_page.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  testWidgets('Login page renders sign in form', (WidgetTester tester) async {
+    final viewModel = LoginViewModel(_FakeAuthService());
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: LoginPage(viewModel: viewModel),
+      ),
+    );
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
-
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    expect(find.text('Sign in'), findsWidgets);
+    expect(find.text('Username'), findsOneWidget);
+    expect(find.text('Password'), findsOneWidget);
   });
+}
+
+class _FakeAuthService implements IAuthService {
+  @override
+  Future<void> changePassword({
+    required User user,
+    required String newPassword,
+    required String confirmPassword,
+  }) async {}
+
+  @override
+  Future<User?> getCurrentUser() async {
+    return null;
+  }
+
+  @override
+  Future<User> login({
+    required String username,
+    required String password,
+  }) async {
+    return User(
+      id: 1,
+      fullName: 'Test User',
+      username: username,
+      email: 'test@example.com',
+      role: 'admin',
+      isActive: true,
+      mustChangePassword: false,
+      createdAt: DateTime(2026),
+    );
+  }
+
+  @override
+  Future<void> logout() async {}
 }
