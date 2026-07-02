@@ -1,3 +1,6 @@
+import '../../../../core/enums/issue_type.dart';
+import '../../../../core/enums/priority_level.dart';
+import '../../../../core/enums/ticket_status.dart';
 import '../../../../core/errors/exceptions.dart';
 import '../../domain/entities/ticket.dart';
 import '../../domain/repositories/i_ticket_repository.dart';
@@ -16,29 +19,14 @@ class TicketRepositoryImpl implements ITicketRepository {
   final ITicketLocalDataSource _localDataSource;
   final TicketMapper _mapper;
 
-  static const Map<String, Set<String>> _allowedStatusTransitions = {
-    'submitted': {'assigned', 'cancelled'},
-    'assigned': {'processing', 'resolved'},
-    'processing': {'pending', 'resolved'},
-    'pending': {'processing'},
-    'resolved': {'closed'},
-  };
-
-  static const Map<String, String> _statusDisplayNames = {
-    'submitted': 'Submitted',
-    'cancelled': 'Cancelled',
-    'assigned': 'Assigned',
-    'processing': 'Processing',
-    'pending': 'Pending',
-    'resolved': 'Resolved',
-    'closed': 'Closed',
-  };
-
-  static const Map<String, String> _legacyStatusAliases = {
-    'open': 'submitted',
-    'inprogress': 'processing',
-    'reopened': 'processing',
-  };
+  static const Map<TicketStatus, Set<TicketStatus>> _allowedStatusTransitions =
+      {
+        TicketStatus.submitted: {TicketStatus.assigned, TicketStatus.cancelled},
+        TicketStatus.assigned: {TicketStatus.processing, TicketStatus.resolved},
+        TicketStatus.processing: {TicketStatus.pending, TicketStatus.resolved},
+        TicketStatus.pending: {TicketStatus.processing},
+        TicketStatus.resolved: {TicketStatus.closed},
+      };
 
   @override
   Future<List<Ticket>> getTickets() async {
@@ -72,8 +60,8 @@ class TicketRepositoryImpl implements ITicketRepository {
   Future<Ticket> createTicket({
     required String title,
     required String description,
-    String issueType = 'General',
-    String priority = 'Medium',
+    String issueType = IssueType.defaultValue,
+    String priority = PriorityLevel.defaultValue,
     int? requesterId,
     int? categoryId,
     String? attachmentUrl,
@@ -82,9 +70,13 @@ class TicketRepositoryImpl implements ITicketRepository {
     final ticket = TicketDto(
       title: title.trim(),
       description: description.trim(),
-      issueType: issueType.trim().isEmpty ? 'General' : issueType.trim(),
-      priority: priority.trim().isEmpty ? 'Medium' : priority.trim(),
-      status: 'Submitted',
+      issueType: issueType.trim().isEmpty
+          ? IssueType.defaultValue
+          : IssueType.fromValue(issueType).value,
+      priority: priority.trim().isEmpty
+          ? PriorityLevel.defaultValue
+          : PriorityLevel.fromValue(priority).value,
+      status: TicketStatus.submitted.value,
       attachmentUrl: attachmentUrl,
       requestedId: requesterId,
       createdByUserId: requesterId,
@@ -131,7 +123,7 @@ class TicketRepositoryImpl implements ITicketRepository {
     final dto = _mapper.mapToDto(ticket);
     _validateTicketContent(dto);
 
-    if (_statusKey(dto.status) != _statusKey(existingTicket.status)) {
+    if (_parseStatus(dto.status) != _parseStatus(existingTicket.status)) {
       throw const AppException(
         'Use updateTicketStatus to change ticket status.',
       );
@@ -142,8 +134,12 @@ class TicketRepositoryImpl implements ITicketRepository {
         id: dto.id,
         title: dto.title.trim(),
         description: dto.description.trim(),
-        issueType: dto.issueType.trim().isEmpty ? 'General' : dto.issueType,
-        priority: dto.priority.trim().isEmpty ? 'Medium' : dto.priority,
+        issueType: dto.issueType.trim().isEmpty
+            ? IssueType.defaultValue
+            : IssueType.fromValue(dto.issueType).value,
+        priority: dto.priority.trim().isEmpty
+            ? PriorityLevel.defaultValue
+            : PriorityLevel.fromValue(dto.priority).value,
         status: _normalizeStatus(existingTicket.status),
         attachmentUrl: dto.attachmentUrl,
         requestedId: dto.requestedId,
@@ -186,7 +182,7 @@ class TicketRepositoryImpl implements ITicketRepository {
       nextStatus: normalizedStatus,
     );
 
-    if (normalizedStatus.toLowerCase() == 'resolved' &&
+    if (TicketStatus.fromValue(normalizedStatus) == TicketStatus.resolved &&
         (solutionSummary == null || solutionSummary.trim().isEmpty)) {
       throw const AppException(
         'Solution summary is required when resolving a ticket.',
@@ -234,8 +230,8 @@ class TicketRepositoryImpl implements ITicketRepository {
     required String currentStatus,
     required String nextStatus,
   }) {
-    final current = _statusKey(currentStatus);
-    final next = _statusKey(nextStatus);
+    final current = _parseStatus(currentStatus);
+    final next = _parseStatus(nextStatus);
 
     if (current == next) {
       return;
@@ -250,21 +246,20 @@ class TicketRepositoryImpl implements ITicketRepository {
   }
 
   String _normalizeStatus(String status) {
-    final statusKey = _statusKey(status);
-    if (statusKey.isEmpty) {
+    final parsedStatus = TicketStatus.tryParse(status);
+    if (parsedStatus == null) {
       throw const AppException('Ticket status is required.');
     }
 
-    final displayName = _statusDisplayNames[statusKey];
-    if (displayName == null) {
+    return parsedStatus.value;
+  }
+
+  TicketStatus _parseStatus(String status) {
+    final parsedStatus = TicketStatus.tryParse(status);
+    if (parsedStatus == null) {
       throw AppException('Unsupported ticket status: $status.');
     }
 
-    return displayName;
-  }
-
-  String _statusKey(String status) {
-    final key = status.trim().toLowerCase().replaceAll(RegExp(r'[\s_-]+'), '');
-    return _legacyStatusAliases[key] ?? key;
+    return parsedStatus;
   }
 }

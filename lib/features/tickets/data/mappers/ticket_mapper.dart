@@ -1,3 +1,4 @@
+import '../../../../core/enums/ticket_status.dart';
 import '../../domain/entities/ticket.dart';
 import '../dtos/create_ticket_request_dto.dart';
 import '../dtos/ticket_dto.dart';
@@ -84,26 +85,6 @@ class TicketMapper {
   }
 
   String _normalizeStatus(String status) {
-    final key = status.trim().toLowerCase().replaceAll(RegExp(r'[\s_-]+'), '');
-    switch (key) {
-      case 'submitted':
-      case 'open':
-        return 'Submitted';
-      case 'cancelled':
-        return 'Cancelled';
-      case 'assigned':
-        return 'Assigned';
-      case 'processing':
-      case 'inprogress':
-        return 'Processing';
-      case 'pending':
-        return 'Pending';
-      case 'resolved':
-        return 'Resolved';
-      case 'closed':
-        return 'Closed';
-    }
-
-    return status;
+    return TicketStatus.tryParse(status)?.value ?? status;
   }
 }

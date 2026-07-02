@@ -1,6 +1,7 @@
 import 'package:sqflite/sqflite.dart';
 
 import '../../../../core/database/app_database.dart';
+import '../../../../core/enums/ticket_status.dart';
 import '../../../../core/errors/exceptions.dart';
 import '../dtos/ticket_dto.dart';
 import '../dtos/update_ticket_status_dto.dart';
@@ -9,16 +10,19 @@ import 'i_ticket_local_data_source.dart';
 class TicketLocalDataSourceImpl implements ITicketLocalDataSource {
   const TicketLocalDataSourceImpl(this._database);
 
+  static const int _legacyGeneralSupportCategoryId = 4;
+  static const String _generalSupportCategoryName = 'General Support';
+
   final Database _database;
 
   @override
   Future<int> insertTicket(TicketDto ticket) async {
-    final departmentId = await _getCategoryDepartmentId(ticket.categoryId);
+    final categoryRouting = await _getCategoryRouting(ticket.categoryId);
 
     return _database.transaction((transaction) async {
       final id = await transaction.insert(
         AppDatabase.ticketsTable,
-        _ticketInsertMap(ticket, departmentId),
+        _ticketInsertMap(ticket, categoryRouting),
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
 
@@ -92,11 +96,11 @@ class TicketLocalDataSourceImpl implements ITicketLocalDataSource {
       throw ArgumentError('Ticket id is required for update.');
     }
 
-    final departmentId = await _getCategoryDepartmentId(ticket.categoryId);
+    final categoryRouting = await _getCategoryRouting(ticket.categoryId);
 
     return _database.update(
       AppDatabase.ticketsTable,
-      _ticketUpdateMap(ticket, departmentId),
+      _ticketUpdateMap(ticket, categoryRouting),
       where: 'id = ?',
       whereArgs: [id],
     );
@@ -120,17 +124,23 @@ class TicketLocalDataSourceImpl implements ITicketLocalDataSource {
       final previousStatus =
           statusUpdate.oldStatus ?? rows.first['status'] as String?;
       final now = statusUpdate.changedAt.toIso8601String();
+      final newStatus = TicketStatus.tryParse(statusUpdate.newStatus);
+      if (newStatus == null) {
+        throw AppException(
+          'Unsupported ticket status: ${statusUpdate.newStatus}.',
+        );
+      }
 
       await transaction.update(
         AppDatabase.ticketsTable,
         {
-          'status': statusUpdate.newStatus,
+          'status': newStatus.value,
           'updatedAt': now,
-          if (statusUpdate.newStatus == 'Resolved') 'resolvedAt': now,
-          if (statusUpdate.newStatus == 'Resolved')
+          if (newStatus == TicketStatus.resolved) 'resolvedAt': now,
+          if (newStatus == TicketStatus.resolved)
             'solutionSummary': statusUpdate.solutionSummary,
-          if (statusUpdate.newStatus == 'Closed') 'closedAt': now,
-          if (statusUpdate.newStatus != 'Closed') 'closedAt': null,
+          if (newStatus == TicketStatus.closed) 'closedAt': now,
+          if (newStatus != TicketStatus.closed) 'closedAt': null,
         },
         where: 'id = ?',
         whereArgs: [statusUpdate.ticketId],
@@ -161,7 +171,7 @@ class TicketLocalDataSourceImpl implements ITicketLocalDataSource {
     );
   }
 
-  Future<int?> _getCategoryDepartmentId(int? categoryId) async {
+  Future<_CategoryRouting?> _getCategoryRouting(int? categoryId) async {
     if (categoryId == null) {
       return null;
     }
@@ -174,30 +184,60 @@ class TicketLocalDataSourceImpl implements ITicketLocalDataSource {
       limit: 1,
     );
 
-    if (rows.isEmpty) {
-      throw const AppException('Selected category is not available.');
+    if (rows.isNotEmpty) {
+      return _CategoryRouting.fromMap(rows.first);
     }
 
-    return rows.first['departmentId'] as int?;
+    if (categoryId == _legacyGeneralSupportCategoryId) {
+      final generalSupportRows = await _database.query(
+        AppDatabase.categoriesTable,
+        columns: ['id', 'departmentId'],
+        where: 'name = ? AND isActive = 1',
+        whereArgs: [_generalSupportCategoryName],
+        limit: 1,
+      );
+
+      if (generalSupportRows.isNotEmpty) {
+        return _CategoryRouting.fromMap(generalSupportRows.first);
+      }
+    }
+
+    throw const AppException('Selected category is not available.');
   }
 
   Map<String, Object?> _ticketInsertMap(
     TicketDto ticket,
-    int? categoryDepartmentId,
+    _CategoryRouting? categoryRouting,
   ) {
     final map = ticket.toMap()..remove('id');
-    map['departmentId'] = ticket.departmentId ?? categoryDepartmentId;
+    map['categoryId'] = categoryRouting?.categoryId ?? ticket.categoryId;
+    map['departmentId'] = ticket.departmentId ?? categoryRouting?.departmentId;
     return map;
   }
 
   Map<String, Object?> _ticketUpdateMap(
     TicketDto ticket,
-    int? categoryDepartmentId,
+    _CategoryRouting? categoryRouting,
   ) {
     final map = ticket.toMap()
       ..remove('id')
       ..remove('createdAt');
-    map['departmentId'] = ticket.departmentId ?? categoryDepartmentId;
+    map['categoryId'] = categoryRouting?.categoryId ?? ticket.categoryId;
+    map['departmentId'] = ticket.departmentId ?? categoryRouting?.departmentId;
     return map;
+  }
+}
+
+class _CategoryRouting {
+  const _CategoryRouting({required this.categoryId, this.departmentId});
+
+  final int categoryId;
+  final int? departmentId;
+
+  factory _CategoryRouting.fromMap(Map<String, Object?> map) {
+    return _CategoryRouting(
+      categoryId: map['id'] as int,
+      departmentId: map['departmentId'] as int?,
+    );
   }
 }

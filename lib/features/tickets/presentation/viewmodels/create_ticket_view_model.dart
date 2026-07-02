@@ -1,5 +1,7 @@
 import 'package:flutter/foundation.dart';
 
+import '../../../../core/enums/issue_type.dart';
+import '../../../../core/enums/priority_level.dart';
 import '../../application/services/i_ticket_service.dart';
 import '../../domain/entities/ticket.dart';
 
@@ -21,8 +23,8 @@ class CreateTicketViewModel extends ChangeNotifier {
   Future<bool> createTicket({
     required String title,
     required String description,
-    String issueType = 'General',
-    String priority = 'Medium',
+    String issueType = IssueType.defaultValue,
+    String priority = PriorityLevel.defaultValue,
     int? requesterId,
     int? categoryId,
     String? attachmentUrl,

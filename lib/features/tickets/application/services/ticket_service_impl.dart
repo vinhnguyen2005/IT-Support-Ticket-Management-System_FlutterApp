@@ -1,3 +1,5 @@
+import '../../../../core/enums/issue_type.dart';
+import '../../../../core/enums/priority_level.dart';
 import '../../../../core/errors/exceptions.dart';
 import '../../domain/entities/ticket.dart';
 import '../../domain/repositories/i_ticket_repository.dart';
@@ -35,8 +37,8 @@ class TicketServiceImpl implements ITicketService {
   Future<Ticket> createTicket({
     required String title,
     required String description,
-    String issueType = 'General',
-    String priority = 'Medium',
+    String issueType = IssueType.defaultValue,
+    String priority = PriorityLevel.defaultValue,
     int? requesterId,
     int? categoryId,
     String? attachmentUrl,
@@ -58,8 +60,8 @@ class TicketServiceImpl implements ITicketService {
     return _ticketRepository.createTicket(
       title: normalizedTitle,
       description: normalizedDescription,
-      issueType: _emptyToDefault(issueType, 'General'),
-      priority: _emptyToDefault(priority, 'Medium'),
+      issueType: _emptyToDefault(issueType, IssueType.defaultValue),
+      priority: _emptyToDefault(priority, PriorityLevel.defaultValue),
       requesterId: requesterId,
       categoryId: categoryId,
       attachmentUrl: _emptyToNull(attachmentUrl),
@@ -87,8 +89,8 @@ class TicketServiceImpl implements ITicketService {
         title: ticket.title.trim(),
         description: ticket.description.trim(),
         status: ticket.status,
-        priority: _emptyToDefault(ticket.priority, 'Medium'),
-        issueType: _emptyToDefault(ticket.issueType, 'General'),
+        priority: _emptyToDefault(ticket.priority, PriorityLevel.defaultValue),
+        issueType: _emptyToDefault(ticket.issueType, IssueType.defaultValue),
         attachmentUrl: _emptyToNull(ticket.attachmentUrl),
         requestedId: ticket.requestedId,
         assignedId: ticket.assignedId,

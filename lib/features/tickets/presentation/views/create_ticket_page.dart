@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/enums/issue_type.dart';
+import '../../../../core/enums/priority_level.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../application/services/i_ticket_service.dart';
 import '../../application/services/ticket_service_impl.dart';
@@ -23,8 +25,8 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
   final TextEditingController _descriptionController = TextEditingController();
   final TextEditingController _attachmentController = TextEditingController();
 
-  String _issueType = 'General';
-  String _priority = 'Medium';
+  String _issueType = IssueType.defaultValue;
+  String _priority = PriorityLevel.defaultValue;
   int? _categoryId = 4;
 
   @override
@@ -112,24 +114,12 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
                         labelText: 'Issue type',
                         border: OutlineInputBorder(),
                       ),
-                      items: const [
-                        DropdownMenuItem(
-                          value: 'General',
-                          child: Text('General'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'Hardware',
-                          child: Text('Hardware'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'Software',
-                          child: Text('Software'),
-                        ),
-                        DropdownMenuItem(
-                          value: 'Network',
-                          child: Text('Network'),
-                        ),
-                      ],
+                      items: IssueType.values.map((issueType) {
+                        return DropdownMenuItem(
+                          value: issueType.value,
+                          child: Text(issueType.value),
+                        );
+                      }).toList(),
                       onChanged: viewModel.isLoading
                           ? null
                           : (value) {
@@ -148,18 +138,12 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
                         labelText: 'Priority',
                         border: OutlineInputBorder(),
                       ),
-                      items: const [
-                        DropdownMenuItem(value: 'Low', child: Text('Low')),
-                        DropdownMenuItem(
-                          value: 'Medium',
-                          child: Text('Medium'),
-                        ),
-                        DropdownMenuItem(value: 'High', child: Text('High')),
-                        DropdownMenuItem(
-                          value: 'Critical',
-                          child: Text('Critical'),
-                        ),
-                      ],
+                      items: PriorityLevel.values.map((priority) {
+                        return DropdownMenuItem(
+                          value: priority.value,
+                          child: Text(priority.value),
+                        );
+                      }).toList(),
                       onChanged: viewModel.isLoading
                           ? null
                           : (value) {

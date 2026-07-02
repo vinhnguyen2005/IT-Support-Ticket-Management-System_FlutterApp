@@ -1,3 +1,4 @@
+import '../../../../core/enums/ticket_status.dart';
 import '../../../../core/errors/exceptions.dart';
 import '../../domain/entities/assignment.dart';
 import '../../domain/entities/progress_update.dart';
@@ -9,12 +10,12 @@ class AssignmentServiceImpl implements IAssignmentService {
 
   final IAssignmentRepository _assignmentRepository;
 
-  static const Map<String, Set<String>> _staffTransitions = {
-    'Submitted': {'Assigned'},
-    'Assigned': {'Processing', 'Resolved'},
-    'Processing': {'Pending', 'Resolved'},
-    'Pending': {'Processing'},
-    'Resolved': {'Closed'},
+  static const Map<TicketStatus, Set<TicketStatus>> _staffTransitions = {
+    TicketStatus.submitted: {TicketStatus.assigned},
+    TicketStatus.assigned: {TicketStatus.processing, TicketStatus.resolved},
+    TicketStatus.processing: {TicketStatus.pending, TicketStatus.resolved},
+    TicketStatus.pending: {TicketStatus.processing},
+    TicketStatus.resolved: {TicketStatus.closed},
   };
 
   @override
@@ -76,10 +77,11 @@ class AssignmentServiceImpl implements IAssignmentService {
     String? note,
     String? solutionSummary,
   }) async {
-    final normalizedStatus = status.trim();
-    if (normalizedStatus.isEmpty) {
+    final parsedStatus = TicketStatus.tryParse(status);
+    if (parsedStatus == null) {
       throw const AppException('Ticket status is required.');
     }
+    final normalizedStatus = parsedStatus.value;
 
     final assignment = await getAssignmentByTicket(
       ticketId: ticketId,
@@ -89,16 +91,16 @@ class AssignmentServiceImpl implements IAssignmentService {
       throw const AppException('Assigned ticket was not found.');
     }
 
-    final currentStatus = assignment.status.trim();
+    final currentStatus = TicketStatus.fromValue(assignment.status);
     final allowedStatuses = _staffTransitions[currentStatus] ?? const {};
-    if (!allowedStatuses.contains(normalizedStatus)) {
+    if (!allowedStatuses.contains(parsedStatus)) {
       throw AppException(
-        'Invalid status transition: $currentStatus -> $normalizedStatus.',
+        'Invalid status transition: ${currentStatus.value} -> $normalizedStatus.',
       );
     }
 
     final normalizedSolutionSummary = solutionSummary?.trim();
-    if (normalizedStatus == 'Resolved' &&
+    if (parsedStatus == TicketStatus.resolved &&
         (normalizedSolutionSummary == null ||
             normalizedSolutionSummary.isEmpty)) {
       throw const AppException(

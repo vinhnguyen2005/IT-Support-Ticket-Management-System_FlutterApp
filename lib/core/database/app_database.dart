@@ -1,6 +1,9 @@
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 
+import '../enums/issue_type.dart';
+import '../enums/priority_level.dart';
+import '../enums/ticket_status.dart';
 import '../security/password_hasher.dart';
 
 class AppDatabase {
@@ -383,10 +386,7 @@ class AppDatabase {
   static Future<void> _migrateCategoryDepartmentsV6ToV7(
     Database database,
   ) async {
-    await _syncCategoryDepartments(
-      database,
-      DateTime.now().toIso8601String(),
-    );
+    await _syncCategoryDepartments(database, DateTime.now().toIso8601String());
   }
 
   static Future<void> _syncCategoryDepartments(
@@ -553,10 +553,7 @@ class AppDatabase {
 
       await transaction.update(
         usersTable,
-        {
-          'mustChangePassword': 0,
-          'updatedAt': now,
-        },
+        {'mustChangePassword': 0, 'updatedAt': now},
         where: 'username IN (?, ?)',
         whereArgs: ['superadmin', 'admin'],
       );
@@ -682,9 +679,9 @@ class AppDatabase {
           title: '[Seed] VPN disconnects during payroll',
           description:
               'Finance team cannot keep VPN connected while submitting payroll.',
-          issueType: 'Network',
-          priority: 'Critical',
-          status: 'Processing',
+          issueType: IssueType.network.value,
+          priority: PriorityLevel.critical.value,
+          status: TicketStatus.processing.value,
           createdByUserId: employeeId,
           staffId: staffId,
           categoryId: networkCategoryId,
@@ -698,9 +695,9 @@ class AppDatabase {
           title: '[Seed] Printer on floor 3 shows paper jam',
           description:
               'Shared printer reports a paper jam after every restart.',
-          issueType: 'Hardware',
-          priority: 'High',
-          status: 'Assigned',
+          issueType: IssueType.hardware.value,
+          priority: PriorityLevel.high.value,
+          status: TicketStatus.assigned.value,
           createdByUserId: employeeId,
           staffId: staffId,
           categoryId: hardwareCategoryId,
@@ -714,9 +711,9 @@ class AppDatabase {
           title: '[Seed] Outlook cannot sync shared mailbox',
           description:
               'User can sign in but the accounting shared mailbox never syncs.',
-          issueType: 'Software',
-          priority: 'Medium',
-          status: 'Pending',
+          issueType: IssueType.software.value,
+          priority: PriorityLevel.medium.value,
+          status: TicketStatus.pending.value,
           createdByUserId: employeeId,
           staffId: staffId,
           categoryId: softwareCategoryId,

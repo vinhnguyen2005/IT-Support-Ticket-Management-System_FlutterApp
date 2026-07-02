@@ -1,6 +1,7 @@
 import 'package:sqflite/sqflite.dart';
 
 import '../../../../core/database/app_database.dart';
+import '../../../../core/enums/ticket_status.dart';
 import '../../../../core/errors/exceptions.dart';
 import '../dtos/assignment_dto.dart';
 import '../dtos/progress_update_dto.dart';
@@ -161,15 +162,21 @@ class AssignmentLocalDataSourceImpl implements IAssignmentLocalDataSource {
 
       final previousStatus = ticketRows.first['status'] as String?;
       final now = DateTime.now().toIso8601String();
+      final parsedStatus = TicketStatus.tryParse(status);
+      if (parsedStatus == null) {
+        throw AppException('Unsupported ticket status: $status.');
+      }
+
       await transaction.update(
         AppDatabase.ticketsTable,
         {
-          'status': status,
+          'status': parsedStatus.value,
           'updatedAt': now,
-          if (status == 'Resolved') 'resolvedAt': now,
-          if (status == 'Resolved') 'solutionSummary': solutionSummary,
-          if (status == 'Closed') 'closedAt': now,
-          if (status != 'Closed') 'closedAt': null,
+          if (parsedStatus == TicketStatus.resolved) 'resolvedAt': now,
+          if (parsedStatus == TicketStatus.resolved)
+            'solutionSummary': solutionSummary,
+          if (parsedStatus == TicketStatus.closed) 'closedAt': now,
+          if (parsedStatus != TicketStatus.closed) 'closedAt': null,
         },
         where: 'id = ?',
         whereArgs: [ticketId],
@@ -179,7 +186,7 @@ class AssignmentLocalDataSourceImpl implements IAssignmentLocalDataSource {
         'ticketId': ticketId,
         'changedByUserId': staffId,
         'fromStatus': previousStatus,
-        'toStatus': status,
+        'toStatus': parsedStatus.value,
         'note': note,
         'changedAt': now,
       });

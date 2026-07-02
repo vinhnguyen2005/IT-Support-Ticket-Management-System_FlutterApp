@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/di/service_locator.dart';
+import '../../../../core/enums/issue_type.dart';
+import '../../../../core/enums/priority_level.dart';
+import '../../../../core/enums/ticket_status.dart';
 import '../../application/services/i_ticket_service.dart';
 import '../../application/services/ticket_service_impl.dart';
 import '../../data/mappers/ticket_mapper.dart';
@@ -24,8 +27,8 @@ class _TicketDetailPageState extends State<TicketDetailPage> {
   final TextEditingController _descriptionController = TextEditingController();
   final TextEditingController _attachmentController = TextEditingController();
 
-  String _issueType = 'General';
-  String _priority = 'Medium';
+  String _issueType = IssueType.defaultValue;
+  String _priority = PriorityLevel.defaultValue;
   int? _categoryId;
   bool _hasLoadedTicket = false;
 
@@ -57,10 +60,10 @@ class _TicketDetailPageState extends State<TicketDetailPage> {
     _attachmentController.text = ticket.attachmentUrl ?? '';
     _issueType = _knownIssueTypes.contains(ticket.issueType)
         ? ticket.issueType
-        : 'General';
+        : IssueType.defaultValue;
     _priority = _knownPriorities.contains(ticket.priority)
         ? ticket.priority
-        : 'Medium';
+        : PriorityLevel.defaultValue;
     _categoryId = ticket.categoryId;
     _hasLoadedTicket = true;
   }
@@ -329,6 +332,9 @@ class _TicketDetailBodyState extends State<_TicketDetailBody> {
       return const Center(child: Text('Ticket not found.'));
     }
 
+    final categoryValue = widget.categoryId ?? _defaultCategoryId;
+    final categoryItems = _categoryDropdownItems(widget.categoryId);
+
     return SafeArea(
       child: ListView(
         padding: const EdgeInsets.all(16),
@@ -402,21 +408,16 @@ class _TicketDetailBodyState extends State<_TicketDetailBody> {
           ),
           const SizedBox(height: 12),
           DropdownButtonFormField<int>(
-            initialValue: widget.categoryId ?? 0,
+            initialValue: categoryValue,
             decoration: const InputDecoration(
               labelText: 'Category',
               border: OutlineInputBorder(),
             ),
-            items: const [
-              DropdownMenuItem(value: 0, child: Text('None')),
-              DropdownMenuItem(value: 1, child: Text('Network Issue')),
-              DropdownMenuItem(value: 2, child: Text('Hardware Issue')),
-              DropdownMenuItem(value: 3, child: Text('Software Issue')),
-            ],
+            items: categoryItems,
             onChanged: viewModel.isLoading
                 ? null
                 : (value) {
-                    widget.onCategoryChanged(value == 0 ? null : value);
+                    widget.onCategoryChanged(value);
                   },
           ),
           const SizedBox(height: 12),
@@ -518,7 +519,7 @@ class _StatusChangeDialogState extends State<_StatusChangeDialog> {
                 border: OutlineInputBorder(),
               ),
             ),
-            if (_status == 'Resolved') ...[
+            if (_status == TicketStatus.resolved.value) ...[
               const SizedBox(height: 12),
               TextField(
                 controller: _solutionController,
@@ -571,47 +572,42 @@ class _StatusChangeResult {
 
 enum _TicketAction { changeStatus, delete }
 
-const List<String> _knownIssueTypes = [
-  'General',
-  'Hardware',
-  'Software',
-  'Network',
-];
+final List<String> _knownIssueTypes = IssueType.values
+    .map((issueType) => issueType.value)
+    .toList(growable: false);
 
-const List<String> _knownPriorities = ['Low', 'Medium', 'High', 'Critical'];
+final List<String> _knownPriorities = PriorityLevel.values
+    .map((priority) => priority.value)
+    .toList(growable: false);
 
-const List<String> _knownStatuses = [
-  'Submitted',
-  'Cancelled',
-  'Assigned',
-  'Processing',
-  'Pending',
-  'Resolved',
-  'Closed',
-];
+final List<String> _knownStatuses = TicketStatus.values
+    .map((status) => status.value)
+    .toList(growable: false);
+
+const int _defaultCategoryId = 4;
+
+const Map<int, String> _knownCategoryLabels = {
+  4: 'General Support',
+  1: 'Network Issue',
+  2: 'Hardware Issue',
+  3: 'Software Issue',
+};
+
+List<DropdownMenuItem<int>> _categoryDropdownItems(int? selectedCategoryId) {
+  final labels = <int, String>{
+    if (selectedCategoryId != null &&
+        !_knownCategoryLabels.containsKey(selectedCategoryId))
+      selectedCategoryId: 'Current category #$selectedCategoryId',
+    ..._knownCategoryLabels,
+  };
+
+  return labels.entries.map((entry) {
+    return DropdownMenuItem(value: entry.key, child: Text(entry.value));
+  }).toList(growable: false);
+}
 
 String _statusLabel(String status) {
-  final key = status.trim().toLowerCase().replaceAll(RegExp(r'[\s_-]+'), '');
-  switch (key) {
-    case 'submitted':
-    case 'open':
-      return 'Submitted';
-    case 'cancelled':
-      return 'Cancelled';
-    case 'assigned':
-      return 'Assigned';
-    case 'processing':
-    case 'inprogress':
-      return 'Processing';
-    case 'pending':
-      return 'Pending';
-    case 'resolved':
-      return 'Resolved';
-    case 'closed':
-      return 'Closed';
-  }
-
-  return 'Submitted';
+  return TicketStatus.fromValue(status).value;
 }
 
 Future<ITicketService> _createTicketService() async {

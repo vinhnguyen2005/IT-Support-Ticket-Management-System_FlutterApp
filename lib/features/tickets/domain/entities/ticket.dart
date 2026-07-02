@@ -1,11 +1,15 @@
+import '../../../../core/enums/issue_type.dart';
+import '../../../../core/enums/priority_level.dart';
+import '../../../../core/enums/ticket_status.dart';
+
 class Ticket {
   const Ticket({
     this.id,
     required this.title,
     required this.description,
-    this.status = 'Submitted',
-    this.priority = 'Medium',
-    this.issueType = 'General',
+    this.status = TicketStatus.defaultValue,
+    this.priority = PriorityLevel.defaultValue,
+    this.issueType = IssueType.defaultValue,
     this.attachmentUrl,
     this.requestedId,
     this.assignedId,
@@ -37,8 +41,7 @@ class Ticket {
   final int? updatedByUserId;
   final bool isDeleted;
 
-  bool get isResolved =>
-      status.toLowerCase() == 'resolved' || status.toLowerCase() == 'closed';
+  bool get isResolved => TicketStatus.fromValue(status).isResolved;
 
   bool get isOpen => !isResolved && !isDeleted;
 }

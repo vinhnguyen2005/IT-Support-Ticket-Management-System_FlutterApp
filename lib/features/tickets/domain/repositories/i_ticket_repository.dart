@@ -1,3 +1,5 @@
+import '../../../../core/enums/issue_type.dart';
+import '../../../../core/enums/priority_level.dart';
 import '../entities/ticket.dart';
 
 abstract interface class ITicketRepository {
@@ -12,8 +14,8 @@ abstract interface class ITicketRepository {
   Future<Ticket> createTicket({
     required String title,
     required String description,
-    String issueType = 'General',
-    String priority = 'Medium',
+    String issueType = IssueType.defaultValue,
+    String priority = PriorityLevel.defaultValue,
     int? requesterId,
     int? categoryId,
     String? attachmentUrl,

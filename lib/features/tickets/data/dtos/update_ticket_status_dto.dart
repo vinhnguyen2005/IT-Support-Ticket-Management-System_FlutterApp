@@ -1,3 +1,5 @@
+import '../../../../core/enums/ticket_status.dart';
+
 class UpdateTicketStatusDto {
   UpdateTicketStatusDto({
     required this.ticketId,
@@ -21,7 +23,7 @@ class UpdateTicketStatusDto {
     return UpdateTicketStatusDto(
       ticketId: map['ticketId'] as int,
       oldStatus: map['fromStatus'] as String?,
-      newStatus: (map['toStatus'] as String?) ?? 'Submitted',
+      newStatus: (map['toStatus'] as String?) ?? TicketStatus.defaultValue,
       changedByUserId: map['changedByUserId'] as int?,
       note: map['note'] as String?,
       solutionSummary: map['solutionSummary'] as String?,

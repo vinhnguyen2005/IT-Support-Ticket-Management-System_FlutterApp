@@ -1,11 +1,15 @@
+import '../../../../core/enums/issue_type.dart';
+import '../../../../core/enums/priority_level.dart';
+import '../../../../core/enums/ticket_status.dart';
+
 class TicketDto {
   const TicketDto({
     this.id,
     this.title = '',
     this.description = '',
-    this.issueType = 'General',
-    this.priority = 'Medium',
-    this.status = 'Submitted',
+    this.issueType = IssueType.defaultValue,
+    this.priority = PriorityLevel.defaultValue,
+    this.status = TicketStatus.defaultValue,
     required this.createdAt,
     this.updatedAt,
     this.attachmentUrl,
@@ -54,9 +58,9 @@ class TicketDto {
       id: _readInt(map['id']),
       title: (map['title'] as String?) ?? '',
       description: (map['description'] as String?) ?? '',
-      issueType: (map['issueType'] as String?) ?? 'General',
-      priority: (map['priority'] as String?) ?? 'Medium',
-      status: (map['status'] as String?) ?? 'Submitted',
+      issueType: (map['issueType'] as String?) ?? IssueType.defaultValue,
+      priority: (map['priority'] as String?) ?? PriorityLevel.defaultValue,
+      status: (map['status'] as String?) ?? TicketStatus.defaultValue,
       attachmentUrl: map['attachmentUrl'] as String?,
       requestedId:
           _readInt(map['requestedId']) ?? _readInt(map['createdByUserId']),
@@ -86,9 +90,9 @@ class TicketDto {
       id: _readInt(map['id']),
       title: (map['title'] as String?) ?? '',
       description: (map['description'] as String?) ?? '',
-      issueType: (map['issueType'] as String?) ?? 'General',
-      priority: (map['priority'] as String?) ?? 'Medium',
-      status: (map['status'] as String?) ?? 'Submitted',
+      issueType: (map['issueType'] as String?) ?? IssueType.defaultValue,
+      priority: (map['priority'] as String?) ?? PriorityLevel.defaultValue,
+      status: (map['status'] as String?) ?? TicketStatus.defaultValue,
       attachmentUrl: map['attachmentUrl'] as String?,
       requestedId: _readInt(map['requestedId']),
       assignedId: _readInt(map['assignedId']),

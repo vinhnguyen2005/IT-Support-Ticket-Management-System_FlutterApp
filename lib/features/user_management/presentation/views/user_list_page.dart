@@ -30,9 +30,7 @@ class _UserListPageState extends State<UserListPage> {
     final created = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
-        builder: (_) => CreateUserPage(
-          currentUserRole: widget.currentUserRole,
-        ),
+        builder: (_) => CreateUserPage(currentUserRole: widget.currentUserRole),
       ),
     );
 
@@ -48,10 +46,8 @@ class _UserListPageState extends State<UserListPage> {
     final updated = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
-        builder: (_) => UpdateUserPage(
-          user: user,
-          currentUserRole: widget.currentUserRole,
-        ),
+        builder: (_) =>
+            UpdateUserPage(user: user, currentUserRole: widget.currentUserRole),
       ),
     );
 
@@ -72,9 +68,6 @@ class _UserListPageState extends State<UserListPage> {
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
-            final visiblePassword = obscurePassword
-                ? List.filled(controller.text.length, '•').join()
-                : controller.text;
             void copyPassword() {
               Clipboard.setData(ClipboardData(text: controller.text));
               setDialogState(() {
@@ -84,79 +77,65 @@ class _UserListPageState extends State<UserListPage> {
 
             return AlertDialog(
               title: Text('Reset password for ${user.username}'),
-              content: Shortcuts(
-                shortcuts: const {
-                  SingleActivator(LogicalKeyboardKey.keyC, control: true):
-                      _CopyTemporaryPasswordIntent(),
-                },
-                child: Actions(
-                  actions: {
-                    _CopyTemporaryPasswordIntent:
-                        CallbackAction<_CopyTemporaryPasswordIntent>(
-                      onInvoke: (_) {
-                        copyPassword();
-                        return null;
-                      },
-                    ),
-                  },
-                  child: Focus(
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextField(
+                    controller: controller,
                     autofocus: true,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        InputDecorator(
-                          decoration: InputDecoration(
-                            labelText: 'Temporary password',
-                            border: const OutlineInputBorder(),
-                            suffixIcon: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                  tooltip: 'Copy password',
-                                  onPressed: copyPassword,
-                                  icon: const Icon(Icons.copy_outlined),
-                                ),
-                                IconButton(
-                                  tooltip: obscurePassword
-                                      ? 'Show password'
-                                      : 'Hide password',
-                                  onPressed: () {
-                                    setDialogState(() {
-                                      obscurePassword = !obscurePassword;
-                                    });
-                                  },
-                                  icon: Icon(
-                                    obscurePassword
-                                        ? Icons.visibility_outlined
-                                        : Icons.visibility_off_outlined,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            suffixIconConstraints: const BoxConstraints(
-                              minWidth: 96,
-                              minHeight: 48,
-                            ),
+                    obscureText: obscurePassword,
+                    decoration: InputDecoration(
+                      labelText: 'Temporary password',
+                      border: const OutlineInputBorder(),
+                      suffixIcon: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            tooltip: 'Copy password',
+                            onPressed: copyPassword,
+                            icon: const Icon(Icons.copy_outlined),
                           ),
-                          child: Text(
-                            visiblePassword,
-                            style: Theme.of(context).textTheme.bodyLarge,
-                          ),
-                        ),
-                        if (copiedPassword) ...[
-                          const SizedBox(height: 8),
-                          Text(
-                            'Temporary password copied.',
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.primary,
+                          IconButton(
+                            tooltip: obscurePassword
+                                ? 'Show password'
+                                : 'Hide password',
+                            onPressed: () {
+                              setDialogState(() {
+                                obscurePassword = !obscurePassword;
+                              });
+                            },
+                            icon: Icon(
+                              obscurePassword
+                                  ? Icons.visibility_outlined
+                                  : Icons.visibility_off_outlined,
                             ),
                           ),
                         ],
-                      ],
+                      ),
+                      suffixIconConstraints: const BoxConstraints(
+                        minWidth: 96,
+                        minHeight: 48,
+                      ),
                     ),
+                    onChanged: (_) {
+                      if (copiedPassword) {
+                        setDialogState(() {
+                          copiedPassword = false;
+                        });
+                      }
+                    },
                   ),
-                ),
+                  if (copiedPassword) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      'Temporary password copied.',
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                    ),
+                  ],
+                ],
               ),
               actions: [
                 TextButton(
@@ -179,10 +158,6 @@ class _UserListPageState extends State<UserListPage> {
         );
       },
     );
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      controller.dispose();
-    });
-
     if (password == null) {
       return;
     }
@@ -197,9 +172,7 @@ class _UserListPageState extends State<UserListPage> {
     }
 
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Temporary password reset for ${user.username}.'),
-      ),
+      SnackBar(content: Text('Temporary password reset for ${user.username}.')),
     );
   }
 
@@ -399,12 +372,4 @@ class _UserTile extends StatelessWidget {
   }
 }
 
-enum _UserAction {
-  edit,
-  toggleActive,
-  resetPassword,
-}
-
-class _CopyTemporaryPasswordIntent extends Intent {
-  const _CopyTemporaryPasswordIntent();
-}
+enum _UserAction { edit, toggleActive, resetPassword }

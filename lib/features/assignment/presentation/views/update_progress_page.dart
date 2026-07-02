@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/enums/ticket_status.dart';
 import '../viewmodels/update_progress_view_model.dart';
 
 class UpdateProgressPage extends StatefulWidget {
@@ -17,12 +18,12 @@ class _UpdateProgressPageState extends State<UpdateProgressPage> {
       TextEditingController();
   String? _status;
 
-  static const Map<String, List<String>> _staffTransitions = {
-    'Submitted': ['Assigned'],
-    'Assigned': ['Processing', 'Resolved'],
-    'Processing': ['Pending', 'Resolved'],
-    'Pending': ['Processing'],
-    'Resolved': ['Closed'],
+  static const Map<TicketStatus, List<TicketStatus>> _staffTransitions = {
+    TicketStatus.submitted: [TicketStatus.assigned],
+    TicketStatus.assigned: [TicketStatus.processing, TicketStatus.resolved],
+    TicketStatus.processing: [TicketStatus.pending, TicketStatus.resolved],
+    TicketStatus.pending: [TicketStatus.processing],
+    TicketStatus.resolved: [TicketStatus.closed],
   };
 
   @override
@@ -95,7 +96,10 @@ class _UpdateProgressPageState extends State<UpdateProgressPage> {
   }
 
   List<String> _allowedNextStatuses(String currentStatus) {
-    return _staffTransitions[currentStatus.trim()] ?? const [];
+    final status = TicketStatus.fromValue(currentStatus);
+    return (_staffTransitions[status] ?? const [])
+        .map((status) => status.value)
+        .toList(growable: false);
   }
 
   @override
@@ -169,7 +173,7 @@ class _UpdateProgressPageState extends State<UpdateProgressPage> {
                         ? null
                         : (value) => setState(() => _status = value),
                   ),
-                if (selectedStatus == 'Resolved') ...[
+                if (selectedStatus == TicketStatus.resolved.value) ...[
                   const SizedBox(height: 16),
                   TextField(
                     controller: _solutionSummaryController,

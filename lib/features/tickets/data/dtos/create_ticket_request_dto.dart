@@ -1,10 +1,14 @@
+import '../../../../core/enums/issue_type.dart';
+import '../../../../core/enums/priority_level.dart';
+import '../../../../core/enums/ticket_status.dart';
+
 class CreateTicketRequestDto {
   const CreateTicketRequestDto({
     required this.title,
     required this.description,
-    this.issueType = 'General',
-    this.priority = 'Medium',
-    this.status = 'Submitted',
+    this.issueType = IssueType.defaultValue,
+    this.priority = PriorityLevel.defaultValue,
+    this.status = TicketStatus.defaultValue,
     this.attachmentUrl,
     this.categoryId,
     this.requestedId,
