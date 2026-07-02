@@ -56,29 +56,49 @@ class _UserListPageState extends State<UserListPage> {
     ManagedUser user,
   ) async {
     final controller = TextEditingController(text: 'Temp@1234');
+    var obscurePassword = true;
     final password = await showDialog<String>(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          title: Text('Reset password for ${user.username}'),
-          content: TextField(
-            controller: controller,
-            decoration: const InputDecoration(
-              labelText: 'Temporary password',
-              border: OutlineInputBorder(),
-            ),
-            obscureText: true,
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, controller.text),
-              child: const Text('Reset'),
-            ),
-          ],
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              title: Text('Reset password for ${user.username}'),
+              content: TextField(
+                controller: controller,
+                decoration: InputDecoration(
+                  labelText: 'Temporary password',
+                  border: const OutlineInputBorder(),
+                  suffixIcon: IconButton(
+                    tooltip: obscurePassword
+                        ? 'Show password'
+                        : 'Hide password',
+                    onPressed: () {
+                      setDialogState(() {
+                        obscurePassword = !obscurePassword;
+                      });
+                    },
+                    icon: Icon(
+                      obscurePassword
+                          ? Icons.visibility_outlined
+                          : Icons.visibility_off_outlined,
+                    ),
+                  ),
+                ),
+                obscureText: obscurePassword,
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.pop(context, controller.text),
+                  child: const Text('Reset'),
+                ),
+              ],
+            );
+          },
         );
       },
     );
