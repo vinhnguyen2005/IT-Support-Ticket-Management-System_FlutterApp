@@ -16,8 +16,13 @@ import '../../features/auth/data/mappers/user_mapper.dart';
 import '../../features/auth/data/repositories/auth_repository_impl.dart';
 import '../../features/auth/domain/repositories/i_auth_repository.dart';
 import '../../features/auth/presentation/viewmodels/login_view_model.dart';
+import '../../features/tickets/application/services/i_ticket_service.dart';
+import '../../features/tickets/application/services/ticket_service_impl.dart';
 import '../../features/tickets/data/datasources/i_ticket_local_data_source.dart';
 import '../../features/tickets/data/datasources/ticket_local_data_source_impl.dart';
+import '../../features/tickets/data/mappers/ticket_mapper.dart';
+import '../../features/tickets/data/repositories/ticket_repository_impl.dart';
+import '../../features/tickets/domain/repositories/i_ticket_repository.dart';
 import '../../features/user_management/application/services/i_user_management_service.dart';
 import '../../features/user_management/application/services/user_management_service_impl.dart';
 import '../../features/user_management/data/datasources/i_user_local_data_source.dart';
@@ -37,6 +42,8 @@ class ServiceLocator {
   static IAssignmentLocalDataSource? _assignmentLocalDataSource;
   static IAssignmentRepository? _assignmentRepository;
   static IAssignmentService? _assignmentService;
+  static ITicketRepository? _ticketRepository;
+  static ITicketService? _ticketService;
   static IAuthLocalDataSource? _authLocalDataSource;
   static IAuthRepository? _authRepository;
   static IAuthService? _authService;
@@ -74,6 +81,17 @@ class ServiceLocator {
     );
   }
 
+  static Future<ITicketRepository> get ticketRepository async {
+    return _ticketRepository ??= TicketRepositoryImpl(
+      localDataSource: await ticketLocalDataSource,
+      mapper: const TicketMapper(),
+    );
+  }
+
+  static Future<ITicketService> get ticketService async {
+    return _ticketService ??= TicketServiceImpl(await ticketRepository);
+  }
+
   static Future<IAuthLocalDataSource> get authLocalDataSource async {
     return _authLocalDataSource ??= AuthLocalDataSourceImpl(await database);
   }
@@ -105,8 +123,9 @@ class ServiceLocator {
   }
 
   static Future<IUserManagementService> get userManagementService async {
-    return _userManagementService ??=
-        UserManagementServiceImpl(await userManagementRepository);
+    return _userManagementService ??= UserManagementServiceImpl(
+      await userManagementRepository,
+    );
   }
 
   static Future<UserListViewModel> get userListViewModel async {

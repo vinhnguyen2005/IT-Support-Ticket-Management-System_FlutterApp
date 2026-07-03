@@ -11,6 +11,13 @@ abstract interface class IAssignmentRepository {
 
   Future<List<ProgressUpdate>> getProgressUpdates(int ticketId);
 
+  Future<void> assignTicket({
+    required int ticketId,
+    required int staffId,
+    required int assignedByUserId,
+    String? note,
+  });
+
   Future<ProgressUpdate> addProgressUpdate({
     required int ticketId,
     required int staffId,

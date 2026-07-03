@@ -48,6 +48,21 @@ class AssignmentRepositoryImpl implements IAssignmentRepository {
   }
 
   @override
+  Future<void> assignTicket({
+    required int ticketId,
+    required int staffId,
+    required int assignedByUserId,
+    String? note,
+  }) {
+    return _localDataSource.assignTicket(
+      ticketId: ticketId,
+      staffId: staffId,
+      assignedByUserId: assignedByUserId,
+      note: note,
+    );
+  }
+
+  @override
   Future<ProgressUpdate> addProgressUpdate({
     required int ticketId,
     required int staffId,

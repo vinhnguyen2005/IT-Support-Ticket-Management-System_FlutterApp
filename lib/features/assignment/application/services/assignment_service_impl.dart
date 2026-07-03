@@ -52,6 +52,33 @@ class AssignmentServiceImpl implements IAssignmentService {
   }
 
   @override
+  Future<void> assignTicket({
+    required int ticketId,
+    required int staffId,
+    required int assignedByUserId,
+    String? note,
+  }) {
+    if (ticketId <= 0) {
+      throw const AppException('Ticket id is required.');
+    }
+
+    if (staffId <= 0) {
+      throw const AppException('Staff id is required.');
+    }
+
+    if (assignedByUserId <= 0) {
+      throw const AppException('Assigned-by user id is required.');
+    }
+
+    return _assignmentRepository.assignTicket(
+      ticketId: ticketId,
+      staffId: staffId,
+      assignedByUserId: assignedByUserId,
+      note: note?.trim().isEmpty ?? true ? null : note!.trim(),
+    );
+  }
+
+  @override
   Future<ProgressUpdate> addProgressUpdate({
     required int ticketId,
     required int staffId,

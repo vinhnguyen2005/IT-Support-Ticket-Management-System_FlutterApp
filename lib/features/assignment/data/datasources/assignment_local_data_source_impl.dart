@@ -120,6 +120,84 @@ class AssignmentLocalDataSourceImpl implements IAssignmentLocalDataSource {
   }
 
   @override
+  Future<void> assignTicket({
+    required int ticketId,
+    required int staffId,
+    required int assignedByUserId,
+    String? note,
+  }) async {
+    await _database.transaction((transaction) async {
+      final ticketRows = await transaction.query(
+        AppDatabase.ticketsTable,
+        columns: ['id', 'status'],
+        where: 'id = ?',
+        whereArgs: [ticketId],
+        limit: 1,
+      );
+
+      if (ticketRows.isEmpty) {
+        throw const AppException('Ticket was not found.');
+      }
+
+      final previousStatus = ticketRows.first['status'] as String?;
+      if (TicketStatus.tryParse(previousStatus ?? '') !=
+          TicketStatus.submitted) {
+        throw const AppException('Only Submitted tickets can be assigned.');
+      }
+
+      final staffRows = await transaction.query(
+        AppDatabase.usersTable,
+        columns: ['id'],
+        where: 'id = ? AND LOWER(role) = ? AND isActive = 1',
+        whereArgs: [staffId, 'staff'],
+        limit: 1,
+      );
+
+      if (staffRows.isEmpty) {
+        throw const AppException('Selected staff account is not active.');
+      }
+
+      final now = DateTime.now().toIso8601String();
+      await transaction.update(
+        AppDatabase.ticketAssignmentsTable,
+        {'isActive': 0, 'updatedAt': now},
+        where: 'ticketId = ? AND isActive = 1',
+        whereArgs: [ticketId],
+      );
+
+      await transaction.insert(AppDatabase.ticketAssignmentsTable, {
+        'ticketId': ticketId,
+        'staffId': staffId,
+        'assignedByUserId': assignedByUserId,
+        'assignedAt': now,
+        'note': note,
+        'isActive': 1,
+        'createdAt': now,
+      });
+
+      await transaction.update(
+        AppDatabase.ticketsTable,
+        {
+          'assignedStaffId': staffId,
+          'status': TicketStatus.assigned.value,
+          'updatedAt': now,
+        },
+        where: 'id = ?',
+        whereArgs: [ticketId],
+      );
+
+      await transaction.insert(AppDatabase.ticketStatusHistoriesTable, {
+        'ticketId': ticketId,
+        'changedByUserId': assignedByUserId,
+        'fromStatus': previousStatus,
+        'toStatus': TicketStatus.assigned.value,
+        'note': note ?? 'Ticket assigned',
+        'changedAt': now,
+      });
+    });
+  }
+
+  @override
   Future<int> addProgressUpdate(ProgressUpdateDto update) {
     return _database.insert(
       AppDatabase.progressUpdatesTable,

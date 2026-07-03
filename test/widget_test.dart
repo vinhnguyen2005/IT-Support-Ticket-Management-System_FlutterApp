@@ -16,7 +16,7 @@ void main() {
     );
 
     expect(find.text('Sign in'), findsWidgets);
-    expect(find.text('Username'), findsOneWidget);
+    expect(find.text('Username or email'), findsOneWidget);
     expect(find.text('Password'), findsOneWidget);
   });
 }

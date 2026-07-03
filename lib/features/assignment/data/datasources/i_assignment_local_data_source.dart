@@ -11,6 +11,13 @@ abstract interface class IAssignmentLocalDataSource {
 
   Future<List<ProgressUpdateDto>> getProgressUpdates(int ticketId);
 
+  Future<void> assignTicket({
+    required int ticketId,
+    required int staffId,
+    required int assignedByUserId,
+    String? note,
+  });
+
   Future<int> addProgressUpdate(ProgressUpdateDto update);
 
   Future<void> updateTicketStatus({

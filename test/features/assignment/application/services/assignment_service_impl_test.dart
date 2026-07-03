@@ -5,6 +5,40 @@ import 'package:it_ticket_support_management/features/assignment/domain/entities
 import 'package:it_ticket_support_management/features/assignment/domain/repositories/i_assignment_repository.dart';
 
 void main() {
+  group('AssignmentServiceImpl.assignTicket', () {
+    test('delegates assignment with trimmed note', () async {
+      final repository = _FakeAssignmentRepository(
+        assignment: _assignment(status: 'Submitted'),
+      );
+      final service = AssignmentServiceImpl(repository);
+
+      await service.assignTicket(
+        ticketId: 10,
+        staffId: 7,
+        assignedByUserId: 1,
+        note: '  Handle first thing today.  ',
+      );
+
+      expect(repository.assignedTicketId, 10);
+      expect(repository.assignedStaffId, 7);
+      expect(repository.assignedByUserId, 1);
+      expect(repository.assignmentNote, 'Handle first thing today.');
+    });
+
+    test('rejects missing assignment ids', () async {
+      final repository = _FakeAssignmentRepository(
+        assignment: _assignment(status: 'Submitted'),
+      );
+      final service = AssignmentServiceImpl(repository);
+
+      expect(
+        () =>
+            service.assignTicket(ticketId: 0, staffId: 7, assignedByUserId: 1),
+        throwsException,
+      );
+    });
+  });
+
   group('AssignmentServiceImpl.updateTicketStatus', () {
     test('allows an SRS staff transition', () async {
       final repository = _FakeAssignmentRepository(
@@ -97,6 +131,10 @@ class _FakeAssignmentRepository implements IAssignmentRepository {
   final Assignment? assignment;
   String? updatedStatus;
   String? solutionSummary;
+  int? assignedTicketId;
+  int? assignedStaffId;
+  int? assignedByUserId;
+  String? assignmentNote;
 
   @override
   Future<ProgressUpdate> addProgressUpdate({
@@ -105,6 +143,19 @@ class _FakeAssignmentRepository implements IAssignmentRepository {
     required String message,
   }) {
     throw UnimplementedError();
+  }
+
+  @override
+  Future<void> assignTicket({
+    required int ticketId,
+    required int staffId,
+    required int assignedByUserId,
+    String? note,
+  }) async {
+    assignedTicketId = ticketId;
+    assignedStaffId = staffId;
+    this.assignedByUserId = assignedByUserId;
+    assignmentNote = note;
   }
 
   @override
