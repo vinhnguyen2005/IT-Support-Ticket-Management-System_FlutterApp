@@ -69,7 +69,12 @@ class _TicketListPageState extends State<TicketListPage> {
 
     final updated = await Navigator.push<bool>(
       context,
-      MaterialPageRoute(builder: (_) => TicketDetailPage(ticketId: ticketId)),
+      MaterialPageRoute(
+        builder: (_) => TicketDetailPage(
+          ticketId: ticketId,
+          currentUserId: widget.requesterId ?? widget.assigneeId,
+        ),
+      ),
     );
 
     if (updated == true) {

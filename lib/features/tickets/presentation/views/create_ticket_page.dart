@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
 
 import '../../../../core/enums/issue_type.dart';
 import '../../../../core/enums/priority_level.dart';
@@ -28,6 +29,7 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
   String _issueType = IssueType.defaultValue;
   String _priority = PriorityLevel.defaultValue;
   int? _categoryId = 4;
+  String? _selectedFileName;
 
   @override
   void initState() {
@@ -45,6 +47,28 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
 
   Future<CreateTicketViewModel> _createViewModel() async {
     return CreateTicketViewModel(await _createTicketService());
+  }
+
+  Future<void> _pickFile() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.image,
+        allowMultiple: false,
+      );
+      if (result != null && result.files.isNotEmpty) {
+        final file = result.files.first;
+        setState(() {
+          _selectedFileName = file.name;
+          _attachmentController.text = file.path ?? file.name;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error picking image: $e')),
+        );
+      }
+    }
   }
 
   Future<void> _submit(CreateTicketViewModel viewModel) async {
@@ -189,14 +213,27 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
                             },
                     ),
                     const SizedBox(height: 12),
-                    TextField(
-                      controller: _attachmentController,
-                      enabled: !viewModel.isLoading,
-                      keyboardType: TextInputType.url,
-                      decoration: const InputDecoration(
-                        labelText: 'Attachment URL',
-                        border: OutlineInputBorder(),
-                      ),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _attachmentController,
+                            enabled: false,
+                            decoration: InputDecoration(
+                              labelText: 'Attachment',
+                              border: const OutlineInputBorder(),
+                              hintText: _selectedFileName ?? 'No image selected',
+                              filled: true,
+                              fillColor: Colors.grey[100],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        FilledButton.tonal(
+                          onPressed: viewModel.isLoading ? null : _pickFile,
+                          child: const Text('Browse'),
+                        ),
+                      ],
                     ),
                     if (viewModel.errorMessage != null) ...[
                       const SizedBox(height: 12),

@@ -1,27 +1,46 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:file_picker/file_picker.dart';
 
 import '../../../../core/di/service_locator.dart';
 import '../../../../core/enums/issue_type.dart';
 import '../../../../core/enums/priority_level.dart';
 import '../../../../core/enums/ticket_status.dart';
+import '../../../../core/enums/user_role.dart';
 import '../../application/services/i_ticket_service.dart';
 import '../../application/services/ticket_service_impl.dart';
 import '../../data/mappers/ticket_mapper.dart';
 import '../../data/repositories/ticket_repository_impl.dart';
 import '../../domain/entities/ticket.dart';
 import '../viewmodels/ticket_detail_view_model.dart';
+import '../../../comments/presentation/viewmodels/comment_view_model.dart';
+import '../../../comments/presentation/views/comment_section.dart';
+import '../../../feedback/presentation/viewmodels/feedback_view_model.dart';
+import '../../../feedback/presentation/views/feedback_page.dart';
+import '../../../feedback/domain/entities/feedback.dart' as feedback_entity;
 
 class TicketDetailPage extends StatefulWidget {
-  const TicketDetailPage({super.key, required this.ticketId});
+  const TicketDetailPage({
+    super.key,
+    required this.ticketId,
+    this.currentUserId,
+  });
 
   final int ticketId;
+  final int? currentUserId;
 
   @override
   State<TicketDetailPage> createState() => _TicketDetailPageState();
 }
 
-class _TicketDetailPageState extends State<TicketDetailPage> {
+class _TicketDetailPageState extends State<TicketDetailPage>
+    with SingleTickerProviderStateMixin {
   late final Future<TicketDetailViewModel> _viewModelFuture;
+  late final Future<CommentViewModel> _commentViewModelFuture;
+  late final Future<FeedbackViewModel> _feedbackViewModelFuture;
+  late final Future<_TicketViewer> _viewerFuture;
+  late final TabController _tabController;
 
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
@@ -30,12 +49,18 @@ class _TicketDetailPageState extends State<TicketDetailPage> {
   String _issueType = IssueType.defaultValue;
   String _priority = PriorityLevel.defaultValue;
   int? _categoryId;
+  String? _selectedFileName;
   bool _hasLoadedTicket = false;
+  bool _isEditing = false;
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
     _viewModelFuture = _createViewModel();
+    _commentViewModelFuture = _createCommentViewModel();
+    _feedbackViewModelFuture = _createFeedbackViewModel();
+    _viewerFuture = _loadViewer();
   }
 
   @override
@@ -43,11 +68,33 @@ class _TicketDetailPageState extends State<TicketDetailPage> {
     _titleController.dispose();
     _descriptionController.dispose();
     _attachmentController.dispose();
+    _tabController.dispose();
     super.dispose();
   }
 
   Future<TicketDetailViewModel> _createViewModel() async {
-    return TicketDetailViewModel(await _createTicketService());
+    final viewModel = TicketDetailViewModel(await _createTicketService());
+    await viewModel.loadTicket(widget.ticketId);
+    return viewModel;
+  }
+
+  Future<CommentViewModel> _createCommentViewModel() async {
+    return ServiceLocator.commentViewModelFactory();
+  }
+
+  Future<FeedbackViewModel> _createFeedbackViewModel() async {
+    final viewModel = await ServiceLocator.feedbackViewModelFactory();
+    await viewModel.loadFeedbackByTicketId(widget.ticketId);
+    return viewModel;
+  }
+
+  Future<_TicketViewer> _loadViewer() async {
+    final loginViewModel = await ServiceLocator.loginViewModel;
+    final user = loginViewModel.currentUser;
+    return _TicketViewer(
+      id: user?.id ?? widget.currentUserId ?? 0,
+      role: UserRole.fromValue(user?.role ?? UserRole.user.value),
+    );
   }
 
   void _populateForm(Ticket ticket) {
@@ -58,6 +105,7 @@ class _TicketDetailPageState extends State<TicketDetailPage> {
     _titleController.text = ticket.title;
     _descriptionController.text = ticket.description;
     _attachmentController.text = ticket.attachmentUrl ?? '';
+    _selectedFileName = ticket.attachmentUrl?.split('/').last;
     _issueType = _knownIssueTypes.contains(ticket.issueType)
         ? ticket.issueType
         : IssueType.defaultValue;
@@ -66,6 +114,28 @@ class _TicketDetailPageState extends State<TicketDetailPage> {
         : PriorityLevel.defaultValue;
     _categoryId = ticket.categoryId;
     _hasLoadedTicket = true;
+  }
+
+  Future<void> _pickFile() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.image,
+        allowMultiple: false,
+      );
+      if (result != null && result.files.isNotEmpty) {
+        final file = result.files.first;
+        setState(() {
+          _selectedFileName = file.name;
+          _attachmentController.text = file.path ?? file.name;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Error picking image: $e')));
+      }
+    }
   }
 
   Future<void> _save(TicketDetailViewModel viewModel, Ticket ticket) async {
@@ -77,7 +147,9 @@ class _TicketDetailPageState extends State<TicketDetailPage> {
         status: ticket.status,
         priority: _priority,
         issueType: _issueType,
-        attachmentUrl: _attachmentController.text,
+        attachmentUrl: _attachmentController.text.isEmpty
+            ? null
+            : _attachmentController.text,
         requestedId: ticket.requestedId,
         assignedId: ticket.assignedId,
         categoryId: _categoryId,
@@ -104,6 +176,7 @@ class _TicketDetailPageState extends State<TicketDetailPage> {
     ScaffoldMessenger.of(
       context,
     ).showSnackBar(const SnackBar(content: Text('Ticket saved.')));
+    setState(() => _isEditing = false);
   }
 
   Future<void> _changeStatus(
@@ -180,10 +253,32 @@ class _TicketDetailPageState extends State<TicketDetailPage> {
     Navigator.pop(context, true);
   }
 
+  void _openFeedbackPage(
+    Ticket ticket,
+    FeedbackViewModel feedbackVm,
+    int userId,
+  ) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => FeedbackPage(
+          ticketId: widget.ticketId,
+          userId: userId,
+          viewModel: feedbackVm,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<TicketDetailViewModel>(
-      future: _viewModelFuture,
+    return FutureBuilder<List<Object>>(
+      future: Future.wait([
+        _viewModelFuture,
+        _commentViewModelFuture,
+        _feedbackViewModelFuture,
+        _viewerFuture,
+      ]),
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
           return const Scaffold(
@@ -191,7 +286,11 @@ class _TicketDetailPageState extends State<TicketDetailPage> {
           );
         }
 
-        final viewModel = snapshot.data!;
+        final viewModel = snapshot.data![0] as TicketDetailViewModel;
+        final commentVm = snapshot.data![1] as CommentViewModel;
+        final feedbackVm = snapshot.data![2] as FeedbackViewModel;
+        final viewer = snapshot.data![3] as _TicketViewer;
+
         return AnimatedBuilder(
           animation: viewModel,
           builder: (context, _) {
@@ -199,37 +298,50 @@ class _TicketDetailPageState extends State<TicketDetailPage> {
             if (ticket != null) {
               _populateForm(ticket);
             }
+            final isClosed = ticket?.status == TicketStatus.closed.value;
+            final isRequester = ticket?.createdByUserId == viewer.id;
+            final canEdit = ticket != null && isRequester && !isClosed;
+            final canGiveFeedback = ticket != null && isRequester && isClosed;
+            final canViewFeedback =
+                viewer.role == UserRole.admin || viewer.role == UserRole.staff;
 
             return Scaffold(
               appBar: AppBar(
                 title: const Text('Ticket details'),
                 actions: [
-                  if (ticket != null)
+                  if (canGiveFeedback)
+                    IconButton(
+                      icon: const Icon(Icons.star),
+                      tooltip: 'Feedback',
+                      onPressed: () =>
+                          _openFeedbackPage(ticket!, feedbackVm, viewer.id),
+                    ),
+                  if (canEdit)
                     PopupMenuButton<_TicketAction>(
                       onSelected: (action) {
                         switch (action) {
-                          case _TicketAction.changeStatus:
-                            _changeStatus(viewModel, ticket);
-                            break;
-                          case _TicketAction.delete:
-                            _delete(viewModel, ticket);
+                          case _TicketAction.edit:
+                            setState(() => _isEditing = true);
                             break;
                         }
                       },
                       itemBuilder: (context) {
                         return const [
                           PopupMenuItem(
-                            value: _TicketAction.changeStatus,
-                            child: Text('Change status'),
-                          ),
-                          PopupMenuItem(
-                            value: _TicketAction.delete,
-                            child: Text('Delete'),
+                            value: _TicketAction.edit,
+                            child: Text('Edit ticket'),
                           ),
                         ];
                       },
                     ),
                 ],
+                bottom: TabBar(
+                  controller: _tabController,
+                  tabs: const [
+                    Tab(text: 'Details'),
+                    Tab(text: 'Comments'),
+                  ],
+                ),
               ),
               body: _TicketDetailBody(
                 viewModel: viewModel,
@@ -241,6 +353,8 @@ class _TicketDetailPageState extends State<TicketDetailPage> {
                 issueType: _issueType,
                 priority: _priority,
                 categoryId: _categoryId,
+                tabController: _tabController,
+                selectedFileName: _selectedFileName,
                 onIssueTypeChanged: (value) {
                   setState(() {
                     _issueType = value;
@@ -257,6 +371,13 @@ class _TicketDetailPageState extends State<TicketDetailPage> {
                   });
                 },
                 onSave: ticket == null ? null : () => _save(viewModel, ticket),
+                onBrowseFile: _pickFile,
+                commentVm: commentVm,
+                currentUserId: viewer.id,
+                isEditing: _isEditing && canEdit,
+                isClosed: isClosed,
+                feedback: feedbackVm.feedback,
+                canViewFeedback: canViewFeedback,
               ),
             );
           },
@@ -266,7 +387,7 @@ class _TicketDetailPageState extends State<TicketDetailPage> {
   }
 }
 
-class _TicketDetailBody extends StatefulWidget {
+class _TicketDetailBody extends StatelessWidget {
   const _TicketDetailBody({
     required this.viewModel,
     required this.ticketId,
@@ -277,10 +398,19 @@ class _TicketDetailBody extends StatefulWidget {
     required this.issueType,
     required this.priority,
     required this.categoryId,
+    required this.tabController,
+    required this.selectedFileName,
     required this.onIssueTypeChanged,
     required this.onPriorityChanged,
     required this.onCategoryChanged,
     required this.onSave,
+    required this.onBrowseFile,
+    required this.commentVm,
+    required this.currentUserId,
+    required this.isEditing,
+    required this.isClosed,
+    required this.feedback,
+    required this.canViewFeedback,
   });
 
   final TicketDetailViewModel viewModel;
@@ -292,33 +422,27 @@ class _TicketDetailBody extends StatefulWidget {
   final String issueType;
   final String priority;
   final int? categoryId;
+  final TabController tabController;
+  final String? selectedFileName;
   final ValueChanged<String> onIssueTypeChanged;
   final ValueChanged<String> onPriorityChanged;
   final ValueChanged<int?> onCategoryChanged;
   final VoidCallback? onSave;
-
-  @override
-  State<_TicketDetailBody> createState() => _TicketDetailBodyState();
-}
-
-class _TicketDetailBodyState extends State<_TicketDetailBody> {
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      widget.viewModel.loadTicket(widget.ticketId);
-    });
-  }
+  final VoidCallback onBrowseFile;
+  final CommentViewModel commentVm;
+  final int currentUserId;
+  final bool isEditing;
+  final bool isClosed;
+  final feedback_entity.Feedback? feedback;
+  final bool canViewFeedback;
 
   @override
   Widget build(BuildContext context) {
-    final viewModel = widget.viewModel;
-
-    if (viewModel.isLoading && widget.ticket == null) {
+    if (viewModel.isLoading && ticket == null) {
       return const Center(child: CircularProgressIndicator());
     }
 
-    if (viewModel.errorMessage != null && widget.ticket == null) {
+    if (viewModel.errorMessage != null && ticket == null) {
       return Center(
         child: Text(
           viewModel.errorMessage!,
@@ -327,14 +451,28 @@ class _TicketDetailBodyState extends State<_TicketDetailBody> {
       );
     }
 
-    final ticket = widget.ticket;
-    if (ticket == null) {
+    final currentTicket = ticket;
+    if (currentTicket == null) {
       return const Center(child: Text('Ticket not found.'));
     }
 
-    final categoryValue = widget.categoryId ?? _defaultCategoryId;
-    final categoryItems = _categoryDropdownItems(widget.categoryId);
+    return TabBarView(
+      controller: tabController,
+      children: [
+        // Tab 1: Details
+        _buildDetailsTab(currentTicket, viewModel),
+        // Tab 2: Comments
+        CommentSection(
+          ticketId: ticketId,
+          currentUserId: currentUserId,
+          viewModel: commentVm,
+          isLocked: isClosed,
+        ),
+      ],
+    );
+  }
 
+  Widget _buildDetailsTab(Ticket ticket, TicketDetailViewModel viewModel) {
     return SafeArea(
       child: ListView(
         padding: const EdgeInsets.all(16),
@@ -351,8 +489,8 @@ class _TicketDetailBodyState extends State<_TicketDetailBody> {
           ),
           const SizedBox(height: 16),
           TextField(
-            controller: widget.titleController,
-            enabled: !viewModel.isLoading,
+            controller: titleController,
+            enabled: isEditing && !viewModel.isLoading,
             decoration: const InputDecoration(
               labelText: 'Title',
               border: OutlineInputBorder(),
@@ -360,8 +498,8 @@ class _TicketDetailBodyState extends State<_TicketDetailBody> {
           ),
           const SizedBox(height: 12),
           TextField(
-            controller: widget.descriptionController,
-            enabled: !viewModel.isLoading,
+            controller: descriptionController,
+            enabled: isEditing && !viewModel.isLoading,
             minLines: 4,
             maxLines: 8,
             decoration: const InputDecoration(
@@ -372,84 +510,132 @@ class _TicketDetailBodyState extends State<_TicketDetailBody> {
           ),
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(
-            initialValue: widget.issueType,
+            initialValue: issueType,
             decoration: const InputDecoration(
               labelText: 'Issue type',
               border: OutlineInputBorder(),
             ),
-            items: _knownIssueTypes.map((issueType) {
-              return DropdownMenuItem(value: issueType, child: Text(issueType));
+            items: _knownIssueTypes.map((type) {
+              return DropdownMenuItem(value: type, child: Text(type));
             }).toList(),
-            onChanged: viewModel.isLoading
+            onChanged: !isEditing || viewModel.isLoading
                 ? null
                 : (value) {
                     if (value != null) {
-                      widget.onIssueTypeChanged(value);
+                      onIssueTypeChanged(value);
                     }
                   },
           ),
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(
-            initialValue: widget.priority,
+            initialValue: priority,
             decoration: const InputDecoration(
               labelText: 'Priority',
               border: OutlineInputBorder(),
             ),
-            items: _knownPriorities.map((priority) {
-              return DropdownMenuItem(value: priority, child: Text(priority));
+            items: _knownPriorities.map((p) {
+              return DropdownMenuItem(value: p, child: Text(p));
             }).toList(),
-            onChanged: viewModel.isLoading
+            onChanged: !isEditing || viewModel.isLoading
                 ? null
                 : (value) {
                     if (value != null) {
-                      widget.onPriorityChanged(value);
+                      onPriorityChanged(value);
                     }
                   },
           ),
           const SizedBox(height: 12),
           DropdownButtonFormField<int>(
-            initialValue: categoryValue,
+            initialValue: categoryId ?? 0,
             decoration: const InputDecoration(
               labelText: 'Category',
               border: OutlineInputBorder(),
             ),
-            items: categoryItems,
-            onChanged: viewModel.isLoading
+            items: const [
+              DropdownMenuItem(value: 0, child: Text('None')),
+              DropdownMenuItem(value: 1, child: Text('Network Issue')),
+              DropdownMenuItem(value: 2, child: Text('Hardware Issue')),
+              DropdownMenuItem(value: 3, child: Text('Software Issue')),
+            ],
+            onChanged: !isEditing || viewModel.isLoading
                 ? null
                 : (value) {
-                    widget.onCategoryChanged(value);
+                    onCategoryChanged(value == 0 ? null : value);
                   },
           ),
           const SizedBox(height: 12),
-          TextField(
-            controller: widget.attachmentController,
-            enabled: !viewModel.isLoading,
-            keyboardType: TextInputType.url,
-            decoration: const InputDecoration(
-              labelText: 'Attachment URL',
-              border: OutlineInputBorder(),
-            ),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: attachmentController,
+                  enabled: false,
+                  decoration: InputDecoration(
+                    labelText: 'Attachment',
+                    border: const OutlineInputBorder(),
+                    hintText: selectedFileName ?? 'No file selected',
+                    filled: true,
+                    fillColor: Colors.grey[100],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              FilledButton.tonal(
+                onPressed: !isEditing || viewModel.isLoading
+                    ? null
+                    : onBrowseFile,
+                child: const Text('Browse'),
+              ),
+            ],
           ),
+          if (attachmentController.text.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            _buildAttachmentPreview(attachmentController.text),
+          ],
           if (viewModel.errorMessage != null) ...[
             const SizedBox(height: 12),
-            Text(
-              viewModel.errorMessage!,
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            Text(viewModel.errorMessage!, style: TextStyle(color: Colors.red)),
+          ],
+          if (canViewFeedback && feedback != null) ...[
+            const SizedBox(height: 24),
+            _FeedbackSummary(feedback: feedback!),
+          ],
+          if (isEditing) ...[
+            const SizedBox(height: 20),
+            FilledButton.icon(
+              onPressed: viewModel.isLoading ? null : onSave,
+              icon: viewModel.isLoading
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.save),
+              label: const Text('Save changes'),
             ),
           ],
-          const SizedBox(height: 20),
-          FilledButton.icon(
-            onPressed: viewModel.isLoading ? null : widget.onSave,
-            icon: viewModel.isLoading
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.save),
-            label: const Text('Save changes'),
-          ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildAttachmentPreview(String path) {
+    final file = File(path);
+    if (!file.existsSync()) {
+      return const Text('The selected image file is no longer available.');
+    }
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: Image.file(
+        file,
+        height: 180,
+        width: double.infinity,
+        fit: BoxFit.cover,
+        errorBuilder: (_, _, _) => const SizedBox(
+          height: 180,
+          child: Center(child: Text('Unable to preview the selected image.')),
+        ),
       ),
     );
   }
@@ -570,7 +756,44 @@ class _StatusChangeResult {
   final String solutionSummary;
 }
 
-enum _TicketAction { changeStatus, delete }
+enum _TicketAction { edit }
+
+class _TicketViewer {
+  const _TicketViewer({required this.id, required this.role});
+
+  final int id;
+  final UserRole role;
+}
+
+class _FeedbackSummary extends StatelessWidget {
+  const _FeedbackSummary({required this.feedback});
+
+  final feedback_entity.Feedback feedback;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('User feedback', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 8),
+        Row(
+          children: List.generate(
+            5,
+            (index) => Icon(
+              index < feedback.rating ? Icons.star : Icons.star_border,
+              color: Theme.of(context).colorScheme.primary,
+            ),
+          ),
+        ),
+        if (feedback.comment?.trim().isNotEmpty ?? false) ...[
+          const SizedBox(height: 8),
+          Text(feedback.comment!),
+        ],
+      ],
+    );
+  }
+}
 
 final List<String> _knownIssueTypes = IssueType.values
     .map((issueType) => issueType.value)
@@ -583,28 +806,6 @@ final List<String> _knownPriorities = PriorityLevel.values
 final List<String> _knownStatuses = TicketStatus.values
     .map((status) => status.value)
     .toList(growable: false);
-
-const int _defaultCategoryId = 4;
-
-const Map<int, String> _knownCategoryLabels = {
-  4: 'General Support',
-  1: 'Network Issue',
-  2: 'Hardware Issue',
-  3: 'Software Issue',
-};
-
-List<DropdownMenuItem<int>> _categoryDropdownItems(int? selectedCategoryId) {
-  final labels = <int, String>{
-    if (selectedCategoryId != null &&
-        !_knownCategoryLabels.containsKey(selectedCategoryId))
-      selectedCategoryId: 'Current category #$selectedCategoryId',
-    ..._knownCategoryLabels,
-  };
-
-  return labels.entries.map((entry) {
-    return DropdownMenuItem(value: entry.key, child: Text(entry.value));
-  }).toList(growable: false);
-}
 
 String _statusLabel(String status) {
   return TicketStatus.fromValue(status).value;

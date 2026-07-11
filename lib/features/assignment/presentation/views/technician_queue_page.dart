@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/di/service_locator.dart';
+import '../../../tickets/presentation/views/ticket_detail_page.dart';
 import '../../domain/entities/assignment.dart';
 import '../viewmodels/technician_queue_view_model.dart';
 import '../viewmodels/update_progress_view_model.dart';
@@ -54,6 +55,16 @@ class _TechnicianQueuePageState extends State<TechnicianQueuePage> {
       ),
     );
 
+    await widget.viewModel.loadAssignments();
+  }
+
+  Future<void> _openTicketDetails(Assignment assignment) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => TicketDetailPage(ticketId: assignment.ticketId),
+      ),
+    );
     await widget.viewModel.loadAssignments();
   }
 
@@ -112,6 +123,7 @@ class _TechnicianQueuePageState extends State<TechnicianQueuePage> {
         return _AssignmentTile(
           assignment: assignment,
           onTap: () => _openAssignment(assignment),
+          onViewDetails: () => _openTicketDetails(assignment),
         );
       },
     );
@@ -119,10 +131,15 @@ class _TechnicianQueuePageState extends State<TechnicianQueuePage> {
 }
 
 class _AssignmentTile extends StatelessWidget {
-  const _AssignmentTile({required this.assignment, required this.onTap});
+  const _AssignmentTile({
+    required this.assignment,
+    required this.onTap,
+    required this.onViewDetails,
+  });
 
   final Assignment assignment;
   final VoidCallback onTap;
+  final VoidCallback onViewDetails;
 
   @override
   Widget build(BuildContext context) {
@@ -164,7 +181,17 @@ class _AssignmentTile extends StatelessWidget {
             ],
           ),
         ),
-        trailing: Icon(Icons.chevron_right, color: colorScheme.primary),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            IconButton(
+              tooltip: 'View ticket details',
+              onPressed: onViewDetails,
+              icon: const Icon(Icons.visibility_outlined),
+            ),
+            Icon(Icons.chevron_right, color: colorScheme.primary),
+          ],
+        ),
       ),
     );
   }

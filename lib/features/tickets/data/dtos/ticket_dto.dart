@@ -117,6 +117,7 @@ class TicketDto {
       'issueType': issueType,
       'priority': priority,
       'status': status,
+      'attachmentUrl': attachmentUrl,
       'createdByUserId': createdByUserId,
       'assignedStaffId': assignedId,
       'categoryId': categoryId,

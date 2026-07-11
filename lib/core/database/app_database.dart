@@ -10,7 +10,7 @@ class AppDatabase {
   AppDatabase._();
 
   static const String databaseName = 'it_support.db';
-  static const int databaseVersion = 7;
+  static const int databaseVersion = 8;
 
   static const String usersTable = 'users';
   static const String departmentsTable = 'departments';
@@ -77,6 +77,9 @@ class AppDatabase {
     }
     if (oldVersion < 7) {
       await _migrateCategoryDepartmentsV6ToV7(database);
+    }
+    if (oldVersion < 8) {
+      await _migrateTicketsV7ToV8(database);
     }
     await _createIndexes(database);
     await seedReferenceData(databaseOverride: database);
@@ -152,6 +155,7 @@ class AppDatabase {
         issueType TEXT NOT NULL,
         priority TEXT NOT NULL,
         status TEXT NOT NULL,
+        attachmentUrl TEXT,
         solutionSummary TEXT,
         createdByUserId INTEGER,
         assignedStaffId INTEGER,
@@ -387,6 +391,15 @@ class AppDatabase {
     Database database,
   ) async {
     await _syncCategoryDepartments(database, DateTime.now().toIso8601String());
+  }
+
+  static Future<void> _migrateTicketsV7ToV8(Database database) async {
+    final existingColumns = await _getColumnNames(database, ticketsTable);
+    if (!existingColumns.contains('attachmentUrl')) {
+      await database.execute(
+        'ALTER TABLE $ticketsTable ADD COLUMN attachmentUrl TEXT',
+      );
+    }
   }
 
   static Future<void> _syncCategoryDepartments(

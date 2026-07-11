@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../tickets/domain/entities/ticket.dart';
+import '../../../tickets/presentation/views/ticket_detail_page.dart';
 import '../../../user_management/domain/entities/managed_user.dart';
 import '../viewmodels/ticket_assignment_view_model.dart';
 
@@ -75,6 +76,21 @@ class _TicketAssignmentListScaffoldState
     );
   }
 
+  Future<void> _openTicket(Ticket ticket) async {
+    final ticketId = ticket.id;
+    if (ticketId == null) {
+      return;
+    }
+
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => TicketDetailPage(ticketId: ticketId)),
+    );
+    if (mounted) {
+      await widget.viewModel.load();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final viewModel = widget.viewModel;
@@ -131,6 +147,7 @@ class _TicketAssignmentListScaffoldState
           ticket: ticket,
           canAssign: viewModel.canAssign(ticket) && !viewModel.isLoading,
           onAssign: () => _assign(ticket),
+          onOpen: () => _openTicket(ticket),
         );
       },
     );
@@ -142,63 +159,72 @@ class _TicketAssignmentTile extends StatelessWidget {
     required this.ticket,
     required this.canAssign,
     required this.onAssign,
+    required this.onOpen,
   });
 
   final Ticket ticket;
   final bool canAssign;
   final VoidCallback onAssign;
+  final VoidCallback onOpen;
 
   @override
   Widget build(BuildContext context) {
     return Card(
       margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(ticket.title, style: Theme.of(context).textTheme.titleMedium),
-            const SizedBox(height: 8),
-            Text(
-              ticket.description,
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                Chip(
-                  visualDensity: VisualDensity.compact,
-                  label: Text(ticket.status),
-                ),
-                Chip(
-                  visualDensity: VisualDensity.compact,
-                  label: Text(ticket.priority),
-                ),
-                Chip(
-                  visualDensity: VisualDensity.compact,
-                  label: Text(ticket.issueType),
-                ),
-                if (ticket.assignedId != null)
+      child: InkWell(
+        onTap: onOpen,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                ticket.title,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                ticket.description,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
                   Chip(
                     visualDensity: VisualDensity.compact,
-                    label: Text('Staff #${ticket.assignedId}'),
+                    label: Text(ticket.status),
                   ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Align(
-              alignment: Alignment.centerRight,
-              child: FilledButton.icon(
-                onPressed: canAssign ? onAssign : null,
-                icon: const Icon(Icons.assignment_ind_outlined),
-                label: const Text('Assign'),
+                  Chip(
+                    visualDensity: VisualDensity.compact,
+                    label: Text(ticket.priority),
+                  ),
+                  Chip(
+                    visualDensity: VisualDensity.compact,
+                    label: Text(ticket.issueType),
+                  ),
+                  if (ticket.assignedId != null)
+                    Chip(
+                      visualDensity: VisualDensity.compact,
+                      label: Text('Staff #${ticket.assignedId}'),
+                    ),
+                ],
               ),
-            ),
-          ],
+              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerRight,
+                child: FilledButton.icon(
+                  onPressed: canAssign ? onAssign : null,
+                  icon: const Icon(Icons.assignment_ind_outlined),
+                  label: const Text('Assign'),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

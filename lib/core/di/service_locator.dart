@@ -1,6 +1,30 @@
 import 'package:sqflite/sqflite.dart';
 
 import '../../features/assignment/application/services/assignment_service_impl.dart';
+import '../../features/attachments/application/services/attachment_service_impl.dart';
+import '../../features/attachments/application/services/i_attachment_service.dart';
+import '../../features/attachments/data/datasources/attachment_local_data_source_impl.dart';
+import '../../features/attachments/data/datasources/i_attachment_local_data_source.dart';
+import '../../features/attachments/data/mappers/attachment_mapper.dart';
+import '../../features/attachments/data/repositories/attachment_repository_impl.dart';
+import '../../features/attachments/domain/repositories/i_attachment_repository.dart';
+import '../../features/attachments/presentation/viewmodels/attachment_view_model.dart';
+import '../../features/comments/application/services/comment_service_impl.dart';
+import '../../features/comments/application/services/i_comment_service.dart';
+import '../../features/comments/data/datasources/comment_local_data_source_impl.dart';
+import '../../features/comments/data/datasources/i_comment_local_data_source.dart';
+import '../../features/comments/data/mappers/comment_mapper.dart';
+import '../../features/comments/data/repositories/comment_repository_impl.dart';
+import '../../features/comments/domain/repositories/i_comment_repository.dart';
+import '../../features/comments/presentation/viewmodels/comment_view_model.dart';
+import '../../features/feedback/application/services/feedback_service_impl.dart';
+import '../../features/feedback/application/services/i_feedback_service.dart';
+import '../../features/feedback/data/datasources/feedback_local_data_source_impl.dart';
+import '../../features/feedback/data/datasources/i_feedback_local_data_source.dart';
+import '../../features/feedback/data/mappers/feedback_mapper.dart';
+import '../../features/feedback/data/repositories/feedback_repository_impl.dart';
+import '../../features/feedback/domain/repositories/i_feedback_repository.dart';
+import '../../features/feedback/presentation/viewmodels/feedback_view_model.dart';
 import '../../features/assignment/application/services/i_assignment_service.dart';
 import '../../features/assignment/data/datasources/assignment_local_data_source_impl.dart';
 import '../../features/assignment/data/datasources/i_assignment_local_data_source.dart';
@@ -51,6 +75,15 @@ class ServiceLocator {
   static IUserLocalDataSource? _userLocalDataSource;
   static IUserManagementRepository? _userManagementRepository;
   static IUserManagementService? _userManagementService;
+  static IFeedbackLocalDataSource? _feedbackLocalDataSource;
+  static IFeedbackRepository? _feedbackRepository;
+  static IFeedbackService? _feedbackService;
+  static ICommentLocalDataSource? _commentLocalDataSource;
+  static ICommentRepository? _commentRepository;
+  static ICommentService? _commentService;
+  static IAttachmentLocalDataSource? _attachmentLocalDataSource;
+  static IAttachmentRepository? _attachmentRepository;
+  static IAttachmentService? _attachmentService;
 
   static Future<Database> get database {
     return AppDatabase.instance;
@@ -138,5 +171,62 @@ class ServiceLocator {
 
   static Future<UpdateUserViewModel> get updateUserViewModel async {
     return UpdateUserViewModel(await userManagementService);
+  }
+
+  static Future<IFeedbackLocalDataSource> get feedbackLocalDataSource async {
+    return _feedbackLocalDataSource ??= FeedbackLocalDataSourceImpl(await database);
+  }
+
+  static Future<IFeedbackRepository> get feedbackRepository async {
+    return _feedbackRepository ??= FeedbackRepositoryImpl(
+      localDataSource: await feedbackLocalDataSource,
+      mapper: const FeedbackMapper(),
+    );
+  }
+
+  static Future<IFeedbackService> get feedbackService async {
+    return _feedbackService ??= FeedbackServiceImpl(await feedbackRepository);
+  }
+
+  static Future<FeedbackViewModel> feedbackViewModelFactory() async {
+    return FeedbackViewModel(await feedbackService);
+  }
+
+  static Future<ICommentLocalDataSource> get commentLocalDataSource async {
+    return _commentLocalDataSource ??= CommentLocalDataSourceImpl(await database);
+  }
+
+  static Future<ICommentRepository> get commentRepository async {
+    return _commentRepository ??= CommentRepositoryImpl(
+      localDataSource: await commentLocalDataSource,
+      mapper: const CommentMapper(),
+    );
+  }
+
+  static Future<ICommentService> get commentService async {
+    return _commentService ??= CommentServiceImpl(await commentRepository);
+  }
+
+  static Future<CommentViewModel> commentViewModelFactory() async {
+    return CommentViewModel(await commentService);
+  }
+
+  static Future<IAttachmentLocalDataSource> get attachmentLocalDataSource async {
+    return _attachmentLocalDataSource ??= AttachmentLocalDataSourceImpl(await database);
+  }
+
+  static Future<IAttachmentRepository> get attachmentRepository async {
+    return _attachmentRepository ??= AttachmentRepositoryImpl(
+      localDataSource: await attachmentLocalDataSource,
+      mapper: const AttachmentMapper(),
+    );
+  }
+
+  static Future<IAttachmentService> get attachmentService async {
+    return _attachmentService ??= AttachmentServiceImpl(await attachmentRepository);
+  }
+
+  static Future<AttachmentViewModel> attachmentViewModelFactory() async {
+    return AttachmentViewModel(await attachmentService);
   }
 }
