@@ -44,6 +44,7 @@ class LoginViewModel extends ChangeNotifier {
       notifyListeners();
       return true;
     } catch (error) {
+      _currentUser = null;
       _status = LoginStatus.failure;
       _errorMessage = error.toString();
       notifyListeners();
