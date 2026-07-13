@@ -71,6 +71,23 @@ void main() {
       );
     });
 
+    test('does not allow an assigned ticket to skip processing', () async {
+      final repository = _FakeAssignmentRepository(
+        assignment: _assignment(status: 'Assigned'),
+      );
+      final service = AssignmentServiceImpl(repository);
+
+      expect(
+        () => service.updateTicketStatus(
+          ticketId: 10,
+          staffId: 7,
+          status: 'Resolved',
+          solutionSummary: 'Attempted shortcut',
+        ),
+        throwsException,
+      );
+    });
+
     test('requires solution summary when resolving', () async {
       final repository = _FakeAssignmentRepository(
         assignment: _assignment(status: 'Processing'),

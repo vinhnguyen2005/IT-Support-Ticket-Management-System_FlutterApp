@@ -71,6 +71,8 @@ void main() {
       expect(find.text('VPN issue'), findsOneWidget);
       expect(find.text('Current: Assigned'), findsOneWidget);
       expect(find.text('Processing'), findsOneWidget);
+      expect(find.text('Resolved'), findsNothing);
+      expect(find.text('Closed'), findsNothing);
       expect(find.text('Initial diagnosis'), findsOneWidget);
       expect(find.text('Status note'), findsOneWidget);
     });
