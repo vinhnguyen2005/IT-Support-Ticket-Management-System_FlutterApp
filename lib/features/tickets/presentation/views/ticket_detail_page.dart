@@ -319,6 +319,7 @@ class _TicketDetailPageState extends State<TicketDetailPage>
             final isClosed = ticketStatus == TicketStatus.closed;
             final isCancelled = ticketStatus == TicketStatus.cancelled;
             final isProcessing = ticketStatus == TicketStatus.processing;
+            final isResolved = ticketStatus == TicketStatus.resolved;
             final isRequester =
                 ticket?.createdByUserId == viewer.id ||
                 ticket?.requestedId == viewer.id;
@@ -326,8 +327,13 @@ class _TicketDetailPageState extends State<TicketDetailPage>
                 ticket != null &&
                 isRequester &&
                 !isProcessing &&
+                !isResolved &&
                 !isClosed &&
                 !isCancelled;
+            final canConfirmResolved = ticket != null &&
+                isRequester &&
+                viewer.role == UserRole.user &&
+                isResolved;
             final canGiveFeedback = ticket != null && isRequester && isClosed;
             final canCancel =
                 ticket != null &&
@@ -342,6 +348,21 @@ class _TicketDetailPageState extends State<TicketDetailPage>
               appBar: AppBar(
                 title: const Text('Ticket details'),
                 actions: [
+                  if (canConfirmResolved)
+                    IconButton(
+                      key: const Key('confirm-resolution-button'),
+                      icon: const Icon(Icons.check_circle),
+                      tooltip: 'Confirm resolution',
+                      onPressed: () => _confirmStatusChange(
+                        viewModel,
+                        ticket,
+                        viewer,
+                        status: TicketStatus.closed,
+                        title: 'Confirm resolution',
+                        message:
+                            'The issue has been resolved. Do you want to close this ticket?',
+                      ),
+                    ),
                   if (canCancel)
                     IconButton(
                       key: const Key('admin-cancel-ticket-button'),
