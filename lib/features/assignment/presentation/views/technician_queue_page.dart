@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../tickets/presentation/views/ticket_detail_page.dart';
 import '../../domain/entities/assignment.dart';
+import '../models/assignment_list_filter.dart';
 import '../viewmodels/technician_queue_view_model.dart';
 import '../viewmodels/update_progress_view_model.dart';
 import 'update_progress_page.dart';
+import 'ticket_queue_filter_bar.dart';
 
 class TechnicianQueuePage extends StatefulWidget {
   const TechnicianQueuePage({super.key, required this.viewModel});
@@ -17,6 +19,10 @@ class TechnicianQueuePage extends StatefulWidget {
 }
 
 class _TechnicianQueuePageState extends State<TechnicianQueuePage> {
+  final TextEditingController _searchController = TextEditingController();
+  String _statusFilter = '';
+  String _priorityFilter = '';
+
   @override
   void initState() {
     super.initState();
@@ -27,6 +33,7 @@ class _TechnicianQueuePageState extends State<TechnicianQueuePage> {
   @override
   void dispose() {
     widget.viewModel.removeListener(_onViewModelChanged);
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -114,19 +121,59 @@ class _TechnicianQueuePageState extends State<TechnicianQueuePage> {
       );
     }
 
-    return ListView.separated(
-      padding: const EdgeInsets.all(16),
-      itemCount: viewModel.assignments.length,
-      separatorBuilder: (context, index) => const SizedBox(height: 12),
-      itemBuilder: (context, index) {
-        final assignment = viewModel.assignments[index];
-        return _AssignmentTile(
-          assignment: assignment,
-          onTap: () => _openAssignment(assignment),
-          onViewDetails: () => _openTicketDetails(assignment),
+    final assignments = AssignmentListFilter(
+      query: _searchController.text,
+      status: _statusFilter,
+      priority: _priorityFilter,
+    ).apply(viewModel.assignments);
+
+    final children = <Widget>[
+      TicketQueueFilterBar(
+        searchController: _searchController,
+        status: _statusFilter,
+        priority: _priorityFilter,
+        resultCount: assignments.length,
+        totalCount: viewModel.assignments.length,
+        onSearchChanged: (_) => setState(() {}),
+        onStatusChanged: (value) => setState(() => _statusFilter = value ?? ''),
+        onPriorityChanged: (value) =>
+            setState(() => _priorityFilter = value ?? ''),
+        onClearFilters: _statusFilter.isEmpty && _priorityFilter.isEmpty
+            ? null
+            : () => setState(() {
+                _statusFilter = '';
+                _priorityFilter = '';
+              }),
+      ),
+      const SizedBox(height: 12),
+    ];
+
+    if (assignments.isEmpty) {
+      children.add(
+        const Padding(
+          padding: EdgeInsets.symmetric(vertical: 32),
+          child: Center(
+            child: Text('No tickets match your search or filters.'),
+          ),
+        ),
+      );
+    } else {
+      for (var index = 0; index < assignments.length; index++) {
+        if (index > 0) {
+          children.add(const SizedBox(height: 12));
+        }
+        final assignment = assignments[index];
+        children.add(
+          _AssignmentTile(
+            assignment: assignment,
+            onTap: () => _openAssignment(assignment),
+            onViewDetails: () => _openTicketDetails(assignment),
+          ),
         );
-      },
-    );
+      }
+    }
+
+    return ListView(padding: const EdgeInsets.all(16), children: children);
   }
 }
 

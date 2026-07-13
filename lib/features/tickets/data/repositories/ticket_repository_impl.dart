@@ -23,8 +23,8 @@ class TicketRepositoryImpl implements ITicketRepository {
 
   static const Map<TicketStatus, Set<TicketStatus>> _allowedStatusTransitions =
       {
-        TicketStatus.submitted: {TicketStatus.assigned, TicketStatus.cancelled},
-        TicketStatus.assigned: {TicketStatus.processing, TicketStatus.resolved},
+        TicketStatus.submitted: {TicketStatus.assigned},
+        TicketStatus.assigned: {TicketStatus.processing},
         TicketStatus.processing: {TicketStatus.resolved},
         TicketStatus.resolved: {TicketStatus.closed},
       };

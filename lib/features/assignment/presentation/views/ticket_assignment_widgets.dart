@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import '../../../tickets/domain/entities/ticket.dart';
 import '../../../tickets/presentation/views/ticket_detail_page.dart';
 import '../../../user_management/domain/entities/managed_user.dart';
+import '../../../tickets/presentation/models/ticket_list_filter.dart';
 import '../viewmodels/ticket_assignment_view_model.dart';
+import 'ticket_queue_filter_bar.dart';
 
 class TicketAssignmentListScaffold extends StatefulWidget {
   const TicketAssignmentListScaffold({
@@ -24,6 +26,10 @@ class TicketAssignmentListScaffold extends StatefulWidget {
 
 class _TicketAssignmentListScaffoldState
     extends State<TicketAssignmentListScaffold> {
+  final TextEditingController _searchController = TextEditingController();
+  String _statusFilter = '';
+  String _priorityFilter = '';
+
   @override
   void initState() {
     super.initState();
@@ -34,6 +40,7 @@ class _TicketAssignmentListScaffoldState
   @override
   void dispose() {
     widget.viewModel.removeListener(_onViewModelChanged);
+    _searchController.dispose();
     super.dispose();
   }
 
@@ -137,20 +144,60 @@ class _TicketAssignmentListScaffoldState
       );
     }
 
-    return ListView.separated(
-      padding: const EdgeInsets.all(16),
-      itemCount: viewModel.tickets.length,
-      separatorBuilder: (context, index) => const SizedBox(height: 12),
-      itemBuilder: (context, index) {
-        final ticket = viewModel.tickets[index];
-        return _TicketAssignmentTile(
-          ticket: ticket,
-          canAssign: viewModel.canAssign(ticket) && !viewModel.isLoading,
-          onAssign: () => _assign(ticket),
-          onOpen: () => _openTicket(ticket),
+    final tickets = TicketListFilter(
+      query: _searchController.text,
+      status: _statusFilter,
+      priority: _priorityFilter,
+    ).apply(viewModel.tickets);
+
+    final children = <Widget>[
+      TicketQueueFilterBar(
+        searchController: _searchController,
+        status: _statusFilter,
+        priority: _priorityFilter,
+        resultCount: tickets.length,
+        totalCount: viewModel.tickets.length,
+        onSearchChanged: (_) => setState(() {}),
+        onStatusChanged: (value) => setState(() => _statusFilter = value ?? ''),
+        onPriorityChanged: (value) =>
+            setState(() => _priorityFilter = value ?? ''),
+        onClearFilters: _statusFilter.isEmpty && _priorityFilter.isEmpty
+            ? null
+            : () => setState(() {
+                _statusFilter = '';
+                _priorityFilter = '';
+              }),
+      ),
+      const SizedBox(height: 12),
+    ];
+
+    if (tickets.isEmpty) {
+      children.add(
+        const Padding(
+          padding: EdgeInsets.symmetric(vertical: 32),
+          child: Center(
+            child: Text('No tickets match your search or filters.'),
+          ),
+        ),
+      );
+    } else {
+      for (var index = 0; index < tickets.length; index++) {
+        if (index > 0) {
+          children.add(const SizedBox(height: 12));
+        }
+        final ticket = tickets[index];
+        children.add(
+          _TicketAssignmentTile(
+            ticket: ticket,
+            canAssign: viewModel.canAssign(ticket) && !viewModel.isLoading,
+            onAssign: () => _assign(ticket),
+            onOpen: () => _openTicket(ticket),
+          ),
         );
-      },
-    );
+      }
+    }
+
+    return ListView(padding: const EdgeInsets.all(16), children: children);
   }
 }
 

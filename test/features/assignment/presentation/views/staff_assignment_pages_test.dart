@@ -54,6 +54,28 @@ void main() {
       expect(find.text('Network'), findsOneWidget);
       expect(find.text('Latest: Checking router'), findsOneWidget);
     });
+
+    testWidgets('searches assigned tickets', (tester) async {
+      final service = _StaffService(
+        assignments: [
+          _assignment(),
+          _assignment(ticketId: 11, title: 'Printer issue'),
+        ],
+      );
+
+      await tester.pumpWidget(_queueApp(service));
+      await tester.pumpAndSettle();
+
+      await tester.enterText(
+        find.byKey(const Key('queue-ticket-search')),
+        'printer',
+      );
+      await tester.pump();
+
+      expect(find.text('Printer issue'), findsOneWidget);
+      expect(find.text('VPN issue'), findsNothing);
+      expect(find.text('1/2 tickets'), findsOneWidget);
+    });
   });
 
   group('UpdateProgressPage', () {
@@ -71,6 +93,8 @@ void main() {
       expect(find.text('VPN issue'), findsOneWidget);
       expect(find.text('Current: Assigned'), findsOneWidget);
       expect(find.text('Processing'), findsOneWidget);
+      expect(find.text('Resolved'), findsNothing);
+      expect(find.text('Closed'), findsNothing);
       expect(find.text('Initial diagnosis'), findsOneWidget);
       expect(find.text('Status note'), findsOneWidget);
     });
@@ -146,15 +170,17 @@ Widget _progressApp(_StaffService service) => MaterialApp(
 );
 
 Assignment _assignment({
+  int ticketId = 10,
+  String title = 'VPN issue',
   String status = 'Assigned',
   String? lastProgressMessage,
 }) => Assignment(
   id: 1,
-  ticketId: 10,
+  ticketId: ticketId,
   staffId: 7,
   assignedAt: DateTime(2026),
   isActive: true,
-  ticketTitle: 'VPN issue',
+  ticketTitle: title,
   ticketDescription: 'VPN disconnects repeatedly.',
   issueType: 'Network',
   priority: 'High',

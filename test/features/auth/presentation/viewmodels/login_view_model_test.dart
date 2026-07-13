@@ -6,6 +6,9 @@ import 'package:it_ticket_support_management/features/auth/application/services/
 import 'package:it_ticket_support_management/features/auth/domain/entities/user.dart';
 import 'package:it_ticket_support_management/features/auth/presentation/viewmodels/login_view_model.dart';
 
+const _testPassword = '<test-password>';
+const _replacementPassword = '<new-test-password>';
+
 void main() {
   group('LoginViewModel.login state transitions', () {
     test(
@@ -17,13 +20,13 @@ void main() {
 
         final success = await viewModel.login(
           username: 'admin',
-          password: 'Admin@123',
+          password: _testPassword,
         );
 
         expect(success, isTrue);
         expect(service.loginCalls, 1);
         expect(service.lastUsername, 'admin');
-        expect(service.lastPassword, 'Admin@123');
+        expect(service.lastPassword, _testPassword);
         expect(viewModel.currentUser?.username, 'admin');
         expect(viewModel.errorMessage, isNull);
         expect(states, [
@@ -56,7 +59,7 @@ void main() {
         final states = _recordStates(viewModel);
         final secondSuccess = await viewModel.login(
           username: 'admin',
-          password: 'Admin@123',
+          password: _testPassword,
         );
 
         expect(secondSuccess, isTrue);
@@ -81,7 +84,7 @@ void main() {
 
         final success = await viewModel.login(
           username: 'admin',
-          password: 'SuperSecret@123',
+          password: _testPassword,
         );
 
         expect(success, isFalse);
@@ -89,7 +92,7 @@ void main() {
         expect(viewModel.isLoading, isFalse);
         expect(viewModel.currentUser, isNull);
         expect(viewModel.errorMessage, 'Username or password is incorrect.');
-        expect(viewModel.errorMessage, isNot(contains('SuperSecret@123')));
+        expect(viewModel.errorMessage, isNot(contains(_testPassword)));
       },
     );
 
@@ -107,7 +110,7 @@ void main() {
         final viewModel = LoginViewModel(service);
 
         expect(
-          await viewModel.login(username: 'admin', password: 'Admin@123'),
+          await viewModel.login(username: 'admin', password: _testPassword),
           isTrue,
         );
 
@@ -136,11 +139,14 @@ void main() {
         );
         final viewModel = LoginViewModel(service);
 
-        final first = viewModel.login(username: 'admin', password: 'Admin@123');
+        final first = viewModel.login(
+          username: 'admin',
+          password: _testPassword,
+        );
         await _flushMicrotasks();
         final second = viewModel.login(
           username: 'admin',
-          password: 'Admin@123',
+          password: _testPassword,
         );
         await _flushMicrotasks();
 
@@ -198,7 +204,7 @@ void main() {
 
         final loginFuture = viewModel.login(
           username: 'admin',
-          password: 'Admin@123',
+          password: _testPassword,
         );
         await _flushMicrotasks();
         await viewModel.logout();
@@ -220,7 +226,7 @@ void main() {
         final service = _AuthServiceFake(loginResults: [_user()]);
         final viewModel = LoginViewModel(service);
 
-        await viewModel.login(username: 'admin', password: 'Admin@123');
+        await viewModel.login(username: 'admin', password: _testPassword);
         await viewModel.logout();
 
         expect(service.logoutCalls, 1);
@@ -237,8 +243,8 @@ void main() {
         final viewModel = LoginViewModel(service);
 
         final success = await viewModel.changePassword(
-          newPassword: 'Password@123',
-          confirmPassword: 'Password@123',
+          newPassword: _replacementPassword,
+          confirmPassword: _replacementPassword,
         );
 
         expect(success, isFalse);
@@ -257,10 +263,10 @@ void main() {
         );
         final viewModel = LoginViewModel(service);
 
-        await viewModel.login(username: 'admin', password: 'Temp@1234');
+        await viewModel.login(username: 'admin', password: _testPassword);
         final success = await viewModel.changePassword(
-          newPassword: 'Password@123',
-          confirmPassword: 'Password@123',
+          newPassword: _replacementPassword,
+          confirmPassword: _replacementPassword,
         );
 
         expect(success, isTrue);

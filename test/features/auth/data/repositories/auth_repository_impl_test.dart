@@ -8,6 +8,10 @@ import 'package:it_ticket_support_management/features/auth/data/dtos/user_dto.da
 import 'package:it_ticket_support_management/features/auth/data/mappers/user_mapper.dart';
 import 'package:it_ticket_support_management/features/auth/data/repositories/auth_repository_impl.dart';
 
+const _testLogin = '<test-login>';
+const _testPassword = '<test-password>';
+const _replacementPassword = '<new-test-password>';
+
 void main() {
   group('AuthRepositoryImpl.login', () {
     test(
@@ -17,13 +21,13 @@ void main() {
         final repository = _repository(source);
 
         final user = await repository.login(
-          username: 'admin@example.com',
-          password: 'Admin@123',
+          username: _testLogin,
+          password: _testPassword,
         );
 
         expect(source.loginCalls, 1);
-        expect(source.lastLoginRequest?.username, 'admin@example.com');
-        expect(source.lastLoginRequest?.password, 'Admin@123');
+        expect(source.lastLoginRequest?.username, _testLogin);
+        expect(source.lastLoginRequest?.password, _testPassword);
         expect(user.id, 1);
         expect(user.username, 'admin');
         expect(user.email, 'admin@example.com');
@@ -87,12 +91,18 @@ void main() {
         final source = _AuthLocalDataSourceSpy();
         final repository = _repository(source);
 
-        await repository.changePassword(userId: 9, newPassword: 'Secret@123');
+        await repository.changePassword(
+          userId: 9,
+          newPassword: _replacementPassword,
+        );
 
         expect(source.changePasswordCalls, 1);
         expect(source.lastChangedUserId, 9);
-        expect(source.lastNewPasswordHash, PasswordHasher.hash('Secret@123'));
-        expect(source.lastNewPasswordHash, isNot('Secret@123'));
+        expect(
+          source.lastNewPasswordHash,
+          PasswordHasher.hash(_replacementPassword),
+        );
+        expect(source.lastNewPasswordHash, isNot(_replacementPassword));
       },
     );
   });
@@ -111,7 +121,7 @@ UserDto _userDto({int id = 1}) {
     fullName: 'System Administrator',
     username: 'admin',
     email: 'admin@example.com',
-    passwordHash: PasswordHasher.hash('Admin@123'),
+    passwordHash: PasswordHasher.hash(_testPassword),
     role: 'admin',
     isActive: true,
     mustChangePassword: false,
