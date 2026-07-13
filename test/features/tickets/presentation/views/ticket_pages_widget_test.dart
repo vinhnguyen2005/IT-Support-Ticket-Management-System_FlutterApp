@@ -110,7 +110,7 @@ void main() {
 
       expect(find.text('VPN unavailable'), findsOneWidget);
       expect(find.text('Printer offline'), findsOneWidget);
-      expect(find.text('2/2'), findsOneWidget);
+      expect(find.text('2/2 tickets'), findsOneWidget);
 
       await tester.enterText(
         find.widgetWithText(TextField, 'Search tickets'),
@@ -120,7 +120,7 @@ void main() {
 
       expect(find.text('VPN unavailable'), findsNothing);
       expect(find.text('Printer offline'), findsOneWidget);
-      expect(find.text('1/2'), findsOneWidget);
+      expect(find.text('1/2 tickets'), findsOneWidget);
     });
 
     testWidgets('paginates requester tickets five at a time', (tester) async {

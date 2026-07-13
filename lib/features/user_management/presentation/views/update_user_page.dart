@@ -163,11 +163,14 @@ class _UpdateUserPageState extends State<UpdateUserPage> {
                         labelText: 'Department',
                         border: OutlineInputBorder(),
                       ),
-                      items: const [
-                        DropdownMenuItem(value: 0, child: Text('None')),
-                        DropdownMenuItem(value: 1, child: Text('IT Support')),
-                        DropdownMenuItem(value: 2, child: Text('Network')),
-                        DropdownMenuItem(value: 3, child: Text('Hardware')),
+                      items: [
+                        const DropdownMenuItem(value: 0, child: Text('None')),
+                        ...viewModel.departments.map(
+                          (department) => DropdownMenuItem(
+                            value: department.id,
+                            child: Text(department.name),
+                          ),
+                        ),
                       ],
                       onChanged: viewModel.isLoading
                           ? null

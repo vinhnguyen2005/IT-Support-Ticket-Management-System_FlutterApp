@@ -12,11 +12,15 @@ class AttachmentList extends StatefulWidget {
     required this.ticketId,
     required this.currentUserId,
     required this.viewModel,
+    this.isLocked = false,
+    this.canDeleteAny = false,
   });
 
   final int ticketId;
   final int currentUserId;
   final AttachmentViewModel viewModel;
+  final bool isLocked;
+  final bool canDeleteAny;
 
   @override
   State<AttachmentList> createState() => _AttachmentListState();
@@ -132,7 +136,9 @@ class _AttachmentListState extends State<AttachmentList> {
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
               FilledButton.icon(
-                onPressed: _isUploading ? null : _pickAndUploadFile,
+                onPressed: _isUploading || widget.isLocked
+                    ? null
+                    : _pickAndUploadFile,
                 icon: _isUploading
                     ? const SizedBox(
                         width: 16,
@@ -145,6 +151,13 @@ class _AttachmentListState extends State<AttachmentList> {
             ],
           ),
         ),
+        if (widget.isLocked)
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
+            child: Text(
+              'Attachments are read-only because this ticket is complete.',
+            ),
+          ),
         ListenableBuilder(
           listenable: widget.viewModel,
           builder: (context, _) {
@@ -184,9 +197,13 @@ class _AttachmentListState extends State<AttachmentList> {
               itemCount: attachments.length,
               itemBuilder: (context, index) {
                 final attachment = attachments[index];
+                final canDelete =
+                    !widget.isLocked &&
+                    (widget.canDeleteAny ||
+                        attachment.uploadedByUserId == widget.currentUserId);
                 return _AttachmentTile(
                   attachment: attachment,
-                  onDelete: attachment.id == null
+                  onDelete: attachment.id == null || !canDelete
                       ? null
                       : () => widget.viewModel.deleteAttachment(attachment.id!),
                 );

@@ -71,6 +71,7 @@ import '../../features/categories/application/services/i_category_service.dart';
 import '../../features/categories/application/services/category_service_impl.dart';
 import '../../features/categories/presentation/viewmodels/category_view_model.dart';
 import '../database/app_database.dart';
+import '../database/reference_data_service.dart';
 
 class ServiceLocator {
   ServiceLocator._();
@@ -103,10 +104,14 @@ class ServiceLocator {
   static CategoryLocalDataSource? _categoryLocalDataSource;
   static ICategoryRepository? _categoryRepository;
   static ICategoryService? _categoryService;
-  
+  static ReferenceDataService? _referenceDataService;
 
   static Future<Database> get database {
     return AppDatabase.instance;
+  }
+
+  static Future<ReferenceDataService> get referenceDataService async {
+    return _referenceDataService ??= ReferenceDataService(await database);
   }
 
   static Future<ITicketLocalDataSource> get ticketLocalDataSource async {
@@ -186,15 +191,27 @@ class ServiceLocator {
   }
 
   static Future<CreateUserViewModel> get createUserViewModel async {
-    return CreateUserViewModel(await userManagementService);
+    final viewModel = CreateUserViewModel(
+      await userManagementService,
+      await referenceDataService,
+    );
+    await viewModel.loadDepartments();
+    return viewModel;
   }
 
   static Future<UpdateUserViewModel> get updateUserViewModel async {
-    return UpdateUserViewModel(await userManagementService);
+    final viewModel = UpdateUserViewModel(
+      await userManagementService,
+      await referenceDataService,
+    );
+    await viewModel.loadDepartments();
+    return viewModel;
   }
 
   static Future<IFeedbackLocalDataSource> get feedbackLocalDataSource async {
-    return _feedbackLocalDataSource ??= FeedbackLocalDataSourceImpl(await database);
+    return _feedbackLocalDataSource ??= FeedbackLocalDataSourceImpl(
+      await database,
+    );
   }
 
   static Future<IFeedbackRepository> get feedbackRepository async {
@@ -213,7 +230,9 @@ class ServiceLocator {
   }
 
   static Future<ICommentLocalDataSource> get commentLocalDataSource async {
-    return _commentLocalDataSource ??= CommentLocalDataSourceImpl(await database);
+    return _commentLocalDataSource ??= CommentLocalDataSourceImpl(
+      await database,
+    );
   }
 
   static Future<ICommentRepository> get commentRepository async {
@@ -231,8 +250,11 @@ class ServiceLocator {
     return CommentViewModel(await commentService);
   }
 
-  static Future<IAttachmentLocalDataSource> get attachmentLocalDataSource async {
-    return _attachmentLocalDataSource ??= AttachmentLocalDataSourceImpl(await database);
+  static Future<IAttachmentLocalDataSource>
+  get attachmentLocalDataSource async {
+    return _attachmentLocalDataSource ??= AttachmentLocalDataSourceImpl(
+      await database,
+    );
   }
 
   static Future<IAttachmentRepository> get attachmentRepository async {
@@ -243,12 +265,15 @@ class ServiceLocator {
   }
 
   static Future<IAttachmentService> get attachmentService async {
-    return _attachmentService ??= AttachmentServiceImpl(await attachmentRepository);
+    return _attachmentService ??= AttachmentServiceImpl(
+      await attachmentRepository,
+    );
   }
 
   static Future<AttachmentViewModel> attachmentViewModelFactory() async {
     return AttachmentViewModel(await attachmentService);
   }
+
   // --- Khởi tạo Data Source ---
   static Future<IReportLocalDataSource> get reportLocalDataSource async {
     return _reportLocalDataSource ??= ReportLocalDataSourceImpl(
@@ -273,16 +298,14 @@ class ServiceLocator {
 
   // --- Khởi tạo ViewModel (Dùng kiểu Factory trả về instance mới) ---
   static Future<AdminDashboardViewModel> get adminDashboardViewModel async {
-    return AdminDashboardViewModel(
-      reportService: await reportService,
-    );
+    return AdminDashboardViewModel(reportService: await reportService);
   }
+
   // --- Khởi tạo CategoryViewModel ---
   static Future<CategoryViewModel> get categoryViewModel async {
-    return CategoryViewModel(
-      categoryService: await categoryService,
-    );
+    return CategoryViewModel(categoryService: await categoryService);
   }
+
   static Future<CategoryLocalDataSource> get categoryLocalDataSource async {
     return _categoryLocalDataSource ??= CategoryLocalDataSource(
       database: await database,

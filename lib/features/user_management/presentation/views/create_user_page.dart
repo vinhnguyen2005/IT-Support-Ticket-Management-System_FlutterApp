@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/database/reference_data_service.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../core/enums/user_role.dart';
 import '../viewmodels/create_user_view_model.dart';
@@ -26,6 +27,7 @@ class _CreateUserPageState extends State<CreateUserPage> {
 
   String _role = UserRole.user.value;
   int? _departmentId;
+  bool _obscureTemporaryPassword = true;
 
   @override
   void initState() {
@@ -84,12 +86,14 @@ class _CreateUserPageState extends State<CreateUserPage> {
                 emailController: _emailController,
                 phoneController: _phoneController,
                 passwordController: _passwordController,
+                departments: viewModel.departments,
                 role: _role,
                 availableRoles: _availableRoles,
                 departmentId: _departmentId,
                 errorMessage: viewModel.errorMessage,
                 isLoading: viewModel.isLoading,
                 isCreateMode: true,
+                obscureTemporaryPassword: _obscureTemporaryPassword,
                 onRoleChanged: (role) {
                   setState(() {
                     _role = role;
@@ -101,6 +105,11 @@ class _CreateUserPageState extends State<CreateUserPage> {
                 onDepartmentChanged: (departmentId) {
                   setState(() {
                     _departmentId = departmentId;
+                  });
+                },
+                onToggleTemporaryPasswordVisibility: () {
+                  setState(() {
+                    _obscureTemporaryPassword = !_obscureTemporaryPassword;
                   });
                 },
                 onSubmit: () => _submit(viewModel),
@@ -129,14 +138,17 @@ class _UserForm extends StatelessWidget {
     required this.emailController,
     required this.phoneController,
     required this.passwordController,
+    required this.departments,
     required this.role,
     required this.availableRoles,
     required this.departmentId,
     required this.errorMessage,
     required this.isLoading,
     required this.isCreateMode,
+    required this.obscureTemporaryPassword,
     required this.onRoleChanged,
     required this.onDepartmentChanged,
+    required this.onToggleTemporaryPasswordVisibility,
     required this.onSubmit,
   });
 
@@ -145,14 +157,17 @@ class _UserForm extends StatelessWidget {
   final TextEditingController emailController;
   final TextEditingController phoneController;
   final TextEditingController passwordController;
+  final List<DepartmentReference> departments;
   final String role;
   final List<UserRole> availableRoles;
   final int? departmentId;
   final String? errorMessage;
   final bool isLoading;
   final bool isCreateMode;
+  final bool obscureTemporaryPassword;
   final ValueChanged<String> onRoleChanged;
   final ValueChanged<int?> onDepartmentChanged;
+  final VoidCallback onToggleTemporaryPasswordVisibility;
   final VoidCallback onSubmit;
 
   @override
@@ -226,11 +241,14 @@ class _UserForm extends StatelessWidget {
               labelText: 'Department',
               border: OutlineInputBorder(),
             ),
-            items: const [
-              DropdownMenuItem(value: 0, child: Text('None')),
-              DropdownMenuItem(value: 1, child: Text('IT Support')),
-              DropdownMenuItem(value: 2, child: Text('Network')),
-              DropdownMenuItem(value: 3, child: Text('Hardware')),
+            items: [
+              const DropdownMenuItem(value: 0, child: Text('None')),
+              ...departments.map(
+                (department) => DropdownMenuItem(
+                  value: department.id,
+                  child: Text(department.name),
+                ),
+              ),
             ],
             onChanged: isLoading
                 ? null
@@ -243,10 +261,21 @@ class _UserForm extends StatelessWidget {
             TextField(
               controller: passwordController,
               enabled: !isLoading,
-              obscureText: true,
-              decoration: const InputDecoration(
+              obscureText: obscureTemporaryPassword,
+              decoration: InputDecoration(
                 labelText: 'Temporary password',
-                border: OutlineInputBorder(),
+                border: const OutlineInputBorder(),
+                suffixIcon: IconButton(
+                  tooltip: obscureTemporaryPassword
+                      ? 'Show password'
+                      : 'Hide password',
+                  onPressed: onToggleTemporaryPasswordVisibility,
+                  icon: Icon(
+                    obscureTemporaryPassword
+                        ? Icons.visibility_outlined
+                        : Icons.visibility_off_outlined,
+                  ),
+                ),
               ),
             ),
           ],

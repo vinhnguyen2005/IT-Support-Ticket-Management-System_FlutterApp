@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 
+import '../../../../core/database/reference_data_service.dart';
 import '../../application/services/i_ticket_service.dart';
 import '../../domain/entities/ticket.dart';
 import '../../domain/entities/ticket_status_note.dart';
@@ -7,14 +8,16 @@ import '../../domain/entities/ticket_status_note.dart';
 enum TicketDetailStatus { initial, loading, success, failure }
 
 class TicketDetailViewModel extends ChangeNotifier {
-  TicketDetailViewModel(this._ticketService);
+  TicketDetailViewModel(this._ticketService, [this._referenceDataService]);
 
   final ITicketService _ticketService;
+  final ReferenceDataService? _referenceDataService;
 
   TicketDetailStatus _status = TicketDetailStatus.initial;
   String? _errorMessage;
   Ticket? _ticket;
   List<TicketStatusNote> _statusNotes = const [];
+  List<PriorityReference> _priorities = const [];
 
   TicketDetailStatus get status => _status;
 
@@ -25,6 +28,22 @@ class TicketDetailViewModel extends ChangeNotifier {
   Ticket? get ticket => _ticket;
 
   List<TicketStatusNote> get statusNotes => List.unmodifiable(_statusNotes);
+
+  List<PriorityReference> get priorities => List.unmodifiable(_priorities);
+
+  Future<void> loadPriorities() async {
+    final service = _referenceDataService;
+    if (service == null) {
+      return;
+    }
+
+    try {
+      _priorities = await service.getActivePriorities();
+    } catch (error) {
+      _errorMessage = 'Unable to load priorities: $error';
+    }
+    notifyListeners();
+  }
 
   Future<void> loadTicket(int id) async {
     _status = TicketDetailStatus.loading;

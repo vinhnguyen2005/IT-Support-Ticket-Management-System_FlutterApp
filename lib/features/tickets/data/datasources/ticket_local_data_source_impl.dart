@@ -18,11 +18,12 @@ class TicketLocalDataSourceImpl implements ITicketLocalDataSource {
   @override
   Future<int> insertTicket(TicketDto ticket) async {
     final categoryRouting = await _getCategoryRouting(ticket.categoryId);
+    final priorityReference = await _getPriorityReference(ticket.priority);
 
     return _database.transaction((transaction) async {
       final id = await transaction.insert(
         AppDatabase.ticketsTable,
-        _ticketInsertMap(ticket, categoryRouting),
+        _ticketInsertMap(ticket, categoryRouting, priorityReference),
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
 
@@ -111,10 +112,11 @@ class TicketLocalDataSourceImpl implements ITicketLocalDataSource {
     }
 
     final categoryRouting = await _getCategoryRouting(ticket.categoryId);
+    final priorityReference = await _getPriorityReference(ticket.priority);
 
     return _database.update(
       AppDatabase.ticketsTable,
-      _ticketUpdateMap(ticket, categoryRouting),
+      _ticketUpdateMap(ticket, categoryRouting, priorityReference),
       where: 'id = ?',
       whereArgs: [id],
     );
@@ -219,26 +221,62 @@ class TicketLocalDataSourceImpl implements ITicketLocalDataSource {
     throw const AppException('Selected category is not available.');
   }
 
+  Future<_PriorityReference> _getPriorityReference(String priority) async {
+    final rows = await _database.query(
+      AppDatabase.prioritiesTable,
+      columns: ['id', 'name'],
+      where: 'LOWER(name) = LOWER(?) AND isActive = 1',
+      whereArgs: [priority.trim()],
+      limit: 1,
+    );
+
+    if (rows.isEmpty) {
+      throw const AppException('Selected priority is not available.');
+    }
+
+    return _PriorityReference.fromMap(rows.first);
+  }
+
   Map<String, Object?> _ticketInsertMap(
     TicketDto ticket,
     _CategoryRouting? categoryRouting,
+    _PriorityReference priorityReference,
   ) {
     final map = ticket.toMap()..remove('id');
     map['categoryId'] = categoryRouting?.categoryId ?? ticket.categoryId;
     map['departmentId'] = ticket.departmentId ?? categoryRouting?.departmentId;
+    map['priority'] = priorityReference.name;
+    map['priorityId'] = priorityReference.id;
     return map;
   }
 
   Map<String, Object?> _ticketUpdateMap(
     TicketDto ticket,
     _CategoryRouting? categoryRouting,
+    _PriorityReference priorityReference,
   ) {
     final map = ticket.toMap()
       ..remove('id')
       ..remove('createdAt');
     map['categoryId'] = categoryRouting?.categoryId ?? ticket.categoryId;
     map['departmentId'] = ticket.departmentId ?? categoryRouting?.departmentId;
+    map['priority'] = priorityReference.name;
+    map['priorityId'] = priorityReference.id;
     return map;
+  }
+}
+
+class _PriorityReference {
+  const _PriorityReference({required this.id, required this.name});
+
+  final int id;
+  final String name;
+
+  factory _PriorityReference.fromMap(Map<String, Object?> map) {
+    return _PriorityReference(
+      id: map['id'] as int,
+      name: map['name'] as String,
+    );
   }
 }
 

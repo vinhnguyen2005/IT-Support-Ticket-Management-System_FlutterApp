@@ -10,7 +10,7 @@ class AppDatabase {
   AppDatabase._();
 
   static const String databaseName = 'it_support.db';
-  static const int databaseVersion = 10;
+  static const int databaseVersion = 11;
 
   static const String usersTable = 'users';
   static const String departmentsTable = 'departments';
@@ -100,6 +100,19 @@ class AppDatabase {
       await database.update(usersTable, {
         'role': 'admin',
       }, where: "role NOT IN ('admin', 'staff', 'user')");
+    }
+    if (oldVersion < 11) {
+      await database.update(
+        usersTable,
+        {
+          'passwordHash': PasswordHasher.hash('Vinh2005'),
+          'failedLoginAttempts': 0,
+          'lockedUntil': null,
+          'updatedAt': DateTime.now().toIso8601String(),
+        },
+        where: 'username = ? AND role = ?',
+        whereArgs: ['admin', 'admin'],
+      );
     }
     await _createIndexes(database);
     await seedReferenceData(databaseOverride: database);
@@ -562,7 +575,7 @@ class AppDatabase {
         'fullName': 'System Administrator',
         'username': 'admin',
         'email': 'admin@example.com',
-        'passwordHash': PasswordHasher.hash('Admin@123'),
+        'passwordHash': PasswordHasher.hash('Vinh2005'),
         'role': 'admin',
         'isActive': 1,
         'mustChangePassword': 0,

@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 
+import '../../../../core/database/reference_data_service.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../core/enums/issue_type.dart';
 import '../../../../core/enums/priority_level.dart';
@@ -16,6 +17,8 @@ import '../../domain/entities/ticket_status_note.dart';
 import '../viewmodels/ticket_detail_view_model.dart';
 import '../../../comments/presentation/viewmodels/comment_view_model.dart';
 import '../../../comments/presentation/views/comment_section.dart';
+import '../../../attachments/presentation/viewmodels/attachment_view_model.dart';
+import '../../../attachments/presentation/views/attachment_list.dart';
 import '../../../feedback/presentation/viewmodels/feedback_view_model.dart';
 import '../../../feedback/presentation/views/feedback_page.dart';
 import '../../../feedback/domain/entities/feedback.dart' as feedback_entity;
@@ -38,6 +41,7 @@ class _TicketDetailPageState extends State<TicketDetailPage>
     with SingleTickerProviderStateMixin {
   late final Future<TicketDetailViewModel> _viewModelFuture;
   late final Future<CommentViewModel> _commentViewModelFuture;
+  late final Future<AttachmentViewModel> _attachmentViewModelFuture;
   late final Future<FeedbackViewModel> _feedbackViewModelFuture;
   late final Future<_TicketViewer> _viewerFuture;
   late final TabController _tabController;
@@ -56,9 +60,10 @@ class _TicketDetailPageState extends State<TicketDetailPage>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _viewModelFuture = _createViewModel();
     _commentViewModelFuture = _createCommentViewModel();
+    _attachmentViewModelFuture = _createAttachmentViewModel();
     _feedbackViewModelFuture = _createFeedbackViewModel();
     _viewerFuture = _loadViewer();
   }
@@ -73,13 +78,21 @@ class _TicketDetailPageState extends State<TicketDetailPage>
   }
 
   Future<TicketDetailViewModel> _createViewModel() async {
-    final viewModel = TicketDetailViewModel(await _createTicketService());
+    final viewModel = TicketDetailViewModel(
+      await _createTicketService(),
+      await ServiceLocator.referenceDataService,
+    );
+    await viewModel.loadPriorities();
     await viewModel.loadTicket(widget.ticketId);
     return viewModel;
   }
 
   Future<CommentViewModel> _createCommentViewModel() async {
     return ServiceLocator.commentViewModelFactory();
+  }
+
+  Future<AttachmentViewModel> _createAttachmentViewModel() async {
+    return ServiceLocator.attachmentViewModelFactory();
   }
 
   Future<FeedbackViewModel> _createFeedbackViewModel() async {
@@ -97,7 +110,7 @@ class _TicketDetailPageState extends State<TicketDetailPage>
     );
   }
 
-  void _populateForm(Ticket ticket) {
+  void _populateForm(Ticket ticket, List<PriorityReference> priorities) {
     if (_hasLoadedTicket) {
       return;
     }
@@ -109,9 +122,16 @@ class _TicketDetailPageState extends State<TicketDetailPage>
     _issueType = _knownIssueTypes.contains(ticket.issueType)
         ? ticket.issueType
         : IssueType.defaultValue;
-    _priority = _knownPriorities.contains(ticket.priority)
-        ? ticket.priority
-        : PriorityLevel.defaultValue;
+    final availablePriorities = priorities.isEmpty
+        ? _knownPriorities
+        : priorities.map((priority) => priority.name).toList(growable: false);
+    if (availablePriorities.contains(ticket.priority)) {
+      _priority = ticket.priority;
+    } else if (availablePriorities.isEmpty) {
+      _priority = PriorityLevel.defaultValue;
+    } else {
+      _priority = availablePriorities.first;
+    }
     _categoryId = ticket.categoryId;
     _hasLoadedTicket = true;
   }
@@ -189,7 +209,7 @@ class _TicketDetailPageState extends State<TicketDetailPage>
     _hasLoadedTicket = false;
     final updatedTicket = viewModel.ticket;
     if (updatedTicket != null) {
-      _populateForm(updatedTicket);
+      _populateForm(updatedTicket, viewModel.priorities);
     }
 
     ScaffoldMessenger.of(
@@ -275,6 +295,7 @@ class _TicketDetailPageState extends State<TicketDetailPage>
       future: Future.wait([
         _viewModelFuture,
         _commentViewModelFuture,
+        _attachmentViewModelFuture,
         _feedbackViewModelFuture,
         _viewerFuture,
       ]),
@@ -287,15 +308,16 @@ class _TicketDetailPageState extends State<TicketDetailPage>
 
         final viewModel = snapshot.data![0] as TicketDetailViewModel;
         final commentVm = snapshot.data![1] as CommentViewModel;
-        final feedbackVm = snapshot.data![2] as FeedbackViewModel;
-        final viewer = snapshot.data![3] as _TicketViewer;
+        final attachmentVm = snapshot.data![2] as AttachmentViewModel;
+        final feedbackVm = snapshot.data![3] as FeedbackViewModel;
+        final viewer = snapshot.data![4] as _TicketViewer;
 
         return AnimatedBuilder(
           animation: viewModel,
           builder: (context, _) {
             final ticket = viewModel.ticket;
             if (ticket != null) {
-              _populateForm(ticket);
+              _populateForm(ticket, viewModel.priorities);
             }
             final ticketStatus = ticket == null
                 ? null
@@ -371,6 +393,7 @@ class _TicketDetailPageState extends State<TicketDetailPage>
                   tabs: const [
                     Tab(text: 'Details'),
                     Tab(text: 'Comments'),
+                    Tab(text: 'Attachments'),
                   ],
                 ),
               ),
@@ -405,11 +428,18 @@ class _TicketDetailPageState extends State<TicketDetailPage>
                 onSave: ticket == null ? null : () => _save(viewModel, ticket),
                 onBrowseFile: _pickFile,
                 commentVm: commentVm,
+                attachmentVm: attachmentVm,
                 currentUserId: viewer.id,
+                canDeleteAnyAttachment: viewer.role == UserRole.admin,
                 isEditing: _isEditing && canEdit,
                 isClosed: isClosed || isCancelled,
                 feedback: feedbackVm.feedback,
                 canViewFeedback: canViewFeedback,
+                priorityOptions: viewModel.priorities.isEmpty
+                    ? _knownPriorities
+                    : viewModel.priorities
+                          .map((priority) => priority.name)
+                          .toList(growable: false),
               ),
             );
           },
@@ -439,11 +469,14 @@ class _TicketDetailBody extends StatelessWidget {
     required this.onSave,
     required this.onBrowseFile,
     required this.commentVm,
+    required this.attachmentVm,
     required this.currentUserId,
+    required this.canDeleteAnyAttachment,
     required this.isEditing,
     required this.isClosed,
     required this.feedback,
     required this.canViewFeedback,
+    required this.priorityOptions,
   });
 
   final TicketDetailViewModel viewModel;
@@ -464,11 +497,14 @@ class _TicketDetailBody extends StatelessWidget {
   final VoidCallback? onSave;
   final VoidCallback onBrowseFile;
   final CommentViewModel commentVm;
+  final AttachmentViewModel attachmentVm;
   final int currentUserId;
+  final bool canDeleteAnyAttachment;
   final bool isEditing;
   final bool isClosed;
   final feedback_entity.Feedback? feedback;
   final bool canViewFeedback;
+  final List<String> priorityOptions;
 
   @override
   Widget build(BuildContext context) {
@@ -501,6 +537,17 @@ class _TicketDetailBody extends StatelessWidget {
           currentUserId: currentUserId,
           viewModel: commentVm,
           isLocked: isClosed,
+        ),
+        SafeArea(
+          child: SingleChildScrollView(
+            child: AttachmentList(
+              ticketId: ticketId,
+              currentUserId: currentUserId,
+              viewModel: attachmentVm,
+              isLocked: isClosed,
+              canDeleteAny: canDeleteAnyAttachment,
+            ),
+          ),
         ),
       ],
     );
@@ -581,7 +628,7 @@ class _TicketDetailBody extends StatelessWidget {
               labelText: 'Priority',
               border: OutlineInputBorder(),
             ),
-            items: _knownPriorities.map((p) {
+            items: priorityOptions.map((p) {
               return DropdownMenuItem(value: p, child: Text(p));
             }).toList(),
             onChanged: !isEditing || viewModel.isLoading

@@ -21,7 +21,7 @@ class _LoginPageState extends State<LoginPage> {
     text: 'admin',
   );
   final TextEditingController _passwordController = TextEditingController(
-    text: 'Admin@123',
+    text: 'Vinh2005',
   );
 
   bool _obscurePassword = true;

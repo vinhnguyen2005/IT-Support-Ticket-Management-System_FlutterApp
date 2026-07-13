@@ -37,9 +37,10 @@ class AuthLocalDataSourceImpl implements IAuthLocalDataSource {
       throw const AuthException('This account is disabled.');
     }
 
+    final isAdmin = user.role.toLowerCase() == 'admin';
     final now = DateTime.now();
     final lockedUntil = user.lockedUntil;
-    if (lockedUntil != null && lockedUntil.isAfter(now)) {
+    if (!isAdmin && lockedUntil != null && lockedUntil.isAfter(now)) {
       throw const AuthException(
         'This account is temporarily locked. Please try again later or contact an administrator.',
       );
@@ -54,15 +55,17 @@ class AuthLocalDataSourceImpl implements IAuthLocalDataSource {
           password: request.password,
           passwordHash: passwordHash,
         )) {
-      final isLocked = await _recordFailedLogin(
-        userId: user.id,
-        failedLoginAttempts: failedLoginAttempts,
-        now: now,
-      );
-      if (isLocked) {
-        throw const AuthException(
-          'Too many failed login attempts. Please try again after 15 minutes or contact an administrator.',
+      if (!isAdmin) {
+        final isLocked = await _recordFailedLogin(
+          userId: user.id,
+          failedLoginAttempts: failedLoginAttempts,
+          now: now,
         );
+        if (isLocked) {
+          throw const AuthException(
+            'Too many failed login attempts. Please try again after 15 minutes or contact an administrator.',
+          );
+        }
       }
       throw const AuthException('Username or password is incorrect.');
     }

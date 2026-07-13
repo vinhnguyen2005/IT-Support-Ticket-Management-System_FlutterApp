@@ -46,8 +46,14 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
   }
 
   Future<CreateTicketViewModel> _createViewModel() async {
-    return widget.viewModel ??
-        CreateTicketViewModel(await _createTicketService());
+    final viewModel =
+        widget.viewModel ??
+        CreateTicketViewModel(
+          await _createTicketService(),
+          await ServiceLocator.referenceDataService,
+        );
+    await viewModel.loadPriorities();
+    return viewModel;
   }
 
   Future<void> _pickFile() async {
@@ -182,12 +188,21 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
                         labelText: 'Priority',
                         border: OutlineInputBorder(),
                       ),
-                      items: PriorityLevel.values.map((priority) {
-                        return DropdownMenuItem(
-                          value: priority.value,
-                          child: Text(priority.value),
-                        );
-                      }).toList(),
+                      items:
+                          (viewModel.priorities.isEmpty
+                                  ? PriorityLevel.values.map(
+                                      (priority) => priority.value,
+                                    )
+                                  : viewModel.priorities.map(
+                                      (priority) => priority.name,
+                                    ))
+                              .map((priority) {
+                                return DropdownMenuItem(
+                                  value: priority,
+                                  child: Text(priority),
+                                );
+                              })
+                              .toList(),
                       onChanged: viewModel.isLoading
                           ? null
                           : (value) {
