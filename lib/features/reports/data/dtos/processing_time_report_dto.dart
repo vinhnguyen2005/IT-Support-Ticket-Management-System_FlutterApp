@@ -1,17 +1,19 @@
 class ProcessingTimeReportDto {
-  final String categoryName;
-  final double averageHours;
-
-  ProcessingTimeReportDto({
+  const ProcessingTimeReportDto({
     required this.categoryName,
+    required this.completedTickets,
     required this.averageHours,
   });
 
-  factory ProcessingTimeReportDto.fromMap(Map<String, dynamic> map) {
+  factory ProcessingTimeReportDto.fromMap(Map<String, Object?> map) {
     return ProcessingTimeReportDto(
       categoryName: map['category_name'] as String? ?? 'Unknown',
-      // SQFlite đôi khi trả về int thay vì double nếu số tròn, nên cần ép kiểu an toàn
-      averageHours: (map['average_hours'] as num?)?.toDouble() ?? 0.0,
+      completedTickets: (map['completed_tickets'] as num?)?.toInt() ?? 0,
+      averageHours: (map['average_hours'] as num?)?.toDouble() ?? 0,
     );
   }
+
+  final String categoryName;
+  final int completedTickets;
+  final double averageHours;
 }

@@ -1,65 +1,96 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+
 import '../../application/services/i_report_service.dart';
-import '../../domain/entities/ticket_volume_report.dart';
-import '../../domain/entities/staff_performance_report.dart';
 import '../../domain/entities/processing_time_report.dart';
+import '../../domain/entities/staff_performance_report.dart';
+import '../../domain/entities/ticket_volume_report.dart';
+import '../../domain/entities/user_report.dart';
 
 class AdminDashboardViewModel extends ChangeNotifier {
-  final IReportService reportService;
-
   AdminDashboardViewModel({required this.reportService});
 
-  // Trạng thái giao diện
-  bool isLoading = false;
-  String? errorMessage;
+  final IReportService reportService;
 
-  // Dữ liệu báo cáo
-  List<TicketVolumeReport> volumeReports = [];
-  List<StaffPerformanceReport> performanceReports = [];
-  List<ProcessingTimeReport> processingTimeReports = [];
+  bool _isLoading = false;
+  String? _errorMessage;
+  List<TicketVolumeReport> _volumeReports = const [];
+  List<StaffPerformanceReport> _performanceReports = const [];
+  List<ProcessingTimeReport> _processingTimeReports = const [];
+  List<UserReport> _userReports = const [];
 
-  // Các biến tổng hợp nhanh (Cho Task 14, 15)
+  bool get isLoading => _isLoading;
+  String? get errorMessage => _errorMessage;
+  List<TicketVolumeReport> get volumeReports => _volumeReports;
+  List<StaffPerformanceReport> get performanceReports => _performanceReports;
+  List<ProcessingTimeReport> get processingTimeReports =>
+      _processingTimeReports;
+  List<UserReport> get userReports => _userReports;
+
   int totalTicketsOverall = 0;
+  int totalSubmittedOverall = 0;
+  int totalAssignedOverall = 0;
+  int totalProcessingOverall = 0;
   int totalResolvedOverall = 0;
-  int totalPendingOverall = 0;
+  int totalClosedOverall = 0;
+  int totalCancelledOverall = 0;
+  int activeUsers = 0;
+  int inactiveUsers = 0;
 
-  /// Hàm khởi chạy để load toàn bộ dữ liệu Dashboard
+  int get totalOpenOverall =>
+      totalSubmittedOverall + totalAssignedOverall + totalProcessingOverall;
+
+  double get completionRate {
+    final actionableTickets = totalTicketsOverall - totalCancelledOverall;
+    if (actionableTickets <= 0) return 0;
+    return (totalResolvedOverall + totalClosedOverall) / actionableTickets;
+  }
+
   Future<void> loadDashboardData(String startDate, String endDate) async {
-    isLoading = true;
-    errorMessage = null;
-    notifyListeners(); // Báo UI hiện vòng xoay loading
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
 
     try {
-      // Dùng Future.wait để gọi 3 API/Query cùng lúc giúp tăng tốc độ
       final results = await Future.wait([
         reportService.getTicketVolumeReport(startDate, endDate),
-        reportService.getStaffPerformanceReport(),
-        reportService.getProcessingTimeReport(),
+        reportService.getStaffPerformanceReport(startDate, endDate),
+        reportService.getProcessingTimeReport(startDate, endDate),
+        reportService.getUserReport(startDate, endDate),
       ]);
 
-      volumeReports = results[0] as List<TicketVolumeReport>;
-      performanceReports = results[1] as List<StaffPerformanceReport>;
-      processingTimeReports = results[2] as List<ProcessingTimeReport>;
-
-      // Tính toán số liệu tổng hợp
+      _volumeReports = results[0] as List<TicketVolumeReport>;
+      _performanceReports = results[1] as List<StaffPerformanceReport>;
+      _processingTimeReports = results[2] as List<ProcessingTimeReport>;
+      _userReports = results[3] as List<UserReport>;
       _calculateTotals();
-
-    } catch (e) {
-      errorMessage = 'Lỗi tải dữ liệu: ${e.toString()}';
+    } catch (error) {
+      _errorMessage = 'Failed to load report data: $error';
     } finally {
-      isLoading = false;
-      notifyListeners(); // Báo UI tắt loading và vẽ dữ liệu
+      _isLoading = false;
+      notifyListeners();
     }
   }
 
   void _calculateTotals() {
     totalTicketsOverall = 0;
+    totalSubmittedOverall = 0;
+    totalAssignedOverall = 0;
+    totalProcessingOverall = 0;
     totalResolvedOverall = 0;
-    totalPendingOverall = 0;
-    for (var report in volumeReports) {
+    totalClosedOverall = 0;
+    totalCancelledOverall = 0;
+
+    for (final report in _volumeReports) {
       totalTicketsOverall += report.totalTickets;
+      totalSubmittedOverall += report.submittedTickets;
+      totalAssignedOverall += report.assignedTickets;
+      totalProcessingOverall += report.processingTickets;
       totalResolvedOverall += report.resolvedTickets;
-      totalPendingOverall += report.pendingTickets;
+      totalClosedOverall += report.closedTickets;
+      totalCancelledOverall += report.cancelledTickets;
     }
+
+    activeUsers = _userReports.where((user) => user.isActive).length;
+    inactiveUsers = _userReports.length - activeUsers;
   }
 }
