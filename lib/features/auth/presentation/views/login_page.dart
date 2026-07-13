@@ -168,7 +168,7 @@ class _LoginPageState extends State<LoginPage> {
                           ),
                           const SizedBox(height: 16),
                           const Text(
-                            'Demo admin: admin or admin@example.com / Admin@123',
+                            'Demo admin: admin or admin@example.com / Vinh2005',
                             textAlign: TextAlign.center,
                           ),
                         ],
