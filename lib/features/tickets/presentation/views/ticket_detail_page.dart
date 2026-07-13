@@ -187,66 +187,18 @@ class _TicketDetailPageState extends State<TicketDetailPage>
     required String title,
     required String message,
   }) async {
-    final reasonController = TextEditingController();
-    String? reasonError;
-    final confirmed = await showDialog<bool>(
+    final cancellationReason = await showDialog<String?>(
       context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) => AlertDialog(
-            title: Text(title),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(message),
-                if (status == TicketStatus.cancelled) ...[
-                  const SizedBox(height: 16),
-                  TextField(
-                    key: const Key('admin-cancel-reason-field'),
-                    controller: reasonController,
-                    minLines: 2,
-                    maxLines: 4,
-                    decoration: InputDecoration(
-                      labelText: 'Cancellation reason',
-                      errorText: reasonError,
-                      border: const OutlineInputBorder(),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Back'),
-              ),
-              FilledButton(
-                onPressed: () {
-                  if (status == TicketStatus.cancelled &&
-                      reasonController.text.trim().isEmpty) {
-                    setDialogState(
-                      () => reasonError = 'Cancellation reason is required.',
-                    );
-                    return;
-                  }
-                  Navigator.pop(context, true);
-                },
-                child: const Text('Confirm'),
-              ),
-            ],
-          ),
-        );
-      },
+      builder: (context) => _StatusConfirmationDialog(
+        status: status,
+        title: title,
+        message: message,
+      ),
     );
 
-    if (confirmed != true) {
-      reasonController.dispose();
+    if (cancellationReason == null) {
       return;
     }
-
-    final cancellationReason = reasonController.text.trim();
-    reasonController.dispose();
 
     final ticketId = ticket.id;
     if (ticketId == null) {
@@ -717,6 +669,79 @@ class _TicketDetailBody extends StatelessWidget {
 }
 
 enum _TicketAction { edit }
+
+class _StatusConfirmationDialog extends StatefulWidget {
+  const _StatusConfirmationDialog({
+    required this.status,
+    required this.title,
+    required this.message,
+  });
+
+  final TicketStatus status;
+  final String title;
+  final String message;
+
+  @override
+  State<_StatusConfirmationDialog> createState() =>
+      _StatusConfirmationDialogState();
+}
+
+class _StatusConfirmationDialogState extends State<_StatusConfirmationDialog> {
+  final TextEditingController _reasonController = TextEditingController();
+  String? _reasonError;
+
+  @override
+  void dispose() {
+    _reasonController.dispose();
+    super.dispose();
+  }
+
+  void _confirm() {
+    final reason = _reasonController.text.trim();
+    if (widget.status == TicketStatus.cancelled && reason.isEmpty) {
+      setState(() => _reasonError = 'Cancellation reason is required.');
+      return;
+    }
+    Navigator.pop(context, reason);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.title),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(widget.message),
+            if (widget.status == TicketStatus.cancelled) ...[
+              const SizedBox(height: 16),
+              TextField(
+                key: const Key('admin-cancel-reason-field'),
+                controller: _reasonController,
+                minLines: 2,
+                maxLines: 4,
+                decoration: InputDecoration(
+                  labelText: 'Cancellation reason',
+                  errorText: _reasonError,
+                  border: const OutlineInputBorder(),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Back'),
+        ),
+        FilledButton(onPressed: _confirm, child: const Text('Confirm')),
+      ],
+    );
+  }
+}
 
 class _TicketViewer {
   const _TicketViewer({required this.id, required this.role});
