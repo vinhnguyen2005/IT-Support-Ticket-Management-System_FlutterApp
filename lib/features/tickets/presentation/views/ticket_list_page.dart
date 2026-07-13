@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/di/service_locator.dart';
+import '../../../../core/enums/priority_level.dart';
+import '../../../../core/enums/ticket_status.dart';
 import '../../application/services/i_ticket_service.dart';
 import '../../application/services/ticket_service_impl.dart';
 import '../../data/mappers/ticket_mapper.dart';
@@ -119,6 +121,7 @@ class _TicketListPageState extends State<TicketListPage> {
               ),
               body: _TicketListBody(
                 viewModel: viewModel,
+                usePagination: widget.requesterId != null,
                 onLoad: () => _loadTickets(viewModel),
                 onOpenTicket: (ticket) => _openTicket(viewModel, ticket),
               ),
@@ -133,11 +136,13 @@ class _TicketListPageState extends State<TicketListPage> {
 class _TicketListBody extends StatefulWidget {
   const _TicketListBody({
     required this.viewModel,
+    required this.usePagination,
     required this.onLoad,
     required this.onOpenTicket,
   });
 
   final TicketListViewModel viewModel;
+  final bool usePagination;
   final Future<void> Function() onLoad;
   final ValueChanged<Ticket> onOpenTicket;
 
@@ -146,12 +151,25 @@ class _TicketListBody extends StatefulWidget {
 }
 
 class _TicketListBodyState extends State<_TicketListBody> {
+  static const int _ticketsPerPage = 5;
+
+  final TextEditingController _searchController = TextEditingController();
+
+  int _currentPage = 0;
+  _TicketSortOption _sortOption = _TicketSortOption.newestFirst;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       widget.onLoad();
     });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   @override
@@ -188,19 +206,335 @@ class _TicketListBodyState extends State<_TicketListBody> {
       );
     }
 
+    final tickets = _sortTickets(_filterTickets(viewModel.tickets));
+    final visibleTickets = widget.usePagination
+        ? _paginatedTickets(tickets)
+        : tickets;
+    final pageCount = _pageCount(tickets.length);
+    final showPagination = widget.usePagination && pageCount > 1;
+    final children = <Widget>[
+      _TicketListControls(
+        controller: _searchController,
+        sortOption: _sortOption,
+        resultCount: tickets.length,
+        totalCount: viewModel.tickets.length,
+        onSearchChanged: (_) => _resetPage(),
+        onClearSearch: _searchController.text.isEmpty
+            ? null
+            : () {
+                _searchController.clear();
+                _resetPage();
+              },
+        onSortChanged: (value) {
+          if (value == null) {
+            return;
+          }
+
+          setState(() {
+            _sortOption = value;
+            _currentPage = 0;
+          });
+        },
+      ),
+      const SizedBox(height: 12),
+    ];
+
+    if (visibleTickets.isEmpty) {
+      children.add(
+        const Padding(
+          padding: EdgeInsets.symmetric(vertical: 32),
+          child: Center(child: Text('No tickets match your search.')),
+        ),
+      );
+    } else {
+      for (var i = 0; i < visibleTickets.length; i++) {
+        final ticket = visibleTickets[i];
+        if (i > 0) {
+          children.add(const SizedBox(height: 8));
+        }
+
+        children.add(
+          _TicketTile(ticket: ticket, onTap: () => widget.onOpenTicket(ticket)),
+        );
+      }
+    }
+
+    if (showPagination) {
+      children
+        ..add(const SizedBox(height: 8))
+        ..add(
+          _TicketPaginationControls(
+            currentPage: _effectiveCurrentPage(pageCount),
+            pageCount: pageCount,
+            totalItems: tickets.length,
+            startItem: _pageStartIndex(tickets.length) + 1,
+            endItem: _pageEndIndex(tickets.length),
+            onFirst: () => _setPage(0),
+            onPrevious: () => _setPage(_currentPage - 1),
+            onNext: () => _setPage(_currentPage + 1),
+            onLast: () => _setPage(pageCount - 1),
+          ),
+        );
+    }
+
     return RefreshIndicator(
       onRefresh: widget.onLoad,
-      child: ListView.separated(
+      child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
-        itemCount: viewModel.tickets.length,
-        separatorBuilder: (_, _) => const SizedBox(height: 8),
-        itemBuilder: (context, index) {
-          final ticket = viewModel.tickets[index];
-          return _TicketTile(
-            ticket: ticket,
-            onTap: () => widget.onOpenTicket(ticket),
-          );
-        },
+        children: children,
+      ),
+    );
+  }
+
+  List<Ticket> _filterTickets(List<Ticket> tickets) {
+    final query = _searchController.text.trim().toLowerCase();
+    if (query.isEmpty) {
+      return tickets;
+    }
+
+    return tickets.where((ticket) {
+      final id = ticket.id?.toString() ?? '';
+      return id.contains(query) ||
+          ticket.title.toLowerCase().contains(query) ||
+          ticket.description.toLowerCase().contains(query) ||
+          ticket.status.toLowerCase().contains(query) ||
+          ticket.priority.toLowerCase().contains(query) ||
+          ticket.issueType.toLowerCase().contains(query);
+    }).toList();
+  }
+
+  List<Ticket> _sortTickets(List<Ticket> tickets) {
+    final sortedTickets = [...tickets];
+    sortedTickets.sort((a, b) {
+      return switch (_sortOption) {
+        _TicketSortOption.newestFirst => b.createdAt.compareTo(a.createdAt),
+        _TicketSortOption.oldestFirst => a.createdAt.compareTo(b.createdAt),
+        _TicketSortOption.priorityHighFirst => _priorityRank(
+          b.priority,
+        ).compareTo(_priorityRank(a.priority)),
+        _TicketSortOption.status => TicketStatus.fromValue(
+          a.status,
+        ).index.compareTo(TicketStatus.fromValue(b.status).index),
+      };
+    });
+
+    return sortedTickets;
+  }
+
+  int _priorityRank(String priority) {
+    return PriorityLevel.fromValue(priority).index;
+  }
+
+  List<Ticket> _paginatedTickets(List<Ticket> tickets) {
+    final start = _pageStartIndex(tickets.length);
+    final end = _pageEndIndex(tickets.length);
+    return tickets.sublist(start, end);
+  }
+
+  int _pageCount(int itemCount) {
+    if (itemCount == 0) {
+      return 1;
+    }
+
+    return (itemCount / _ticketsPerPage).ceil();
+  }
+
+  int _effectiveCurrentPage(int pageCount) {
+    if (_currentPage < 0) {
+      return 0;
+    }
+
+    if (_currentPage >= pageCount) {
+      return pageCount - 1;
+    }
+
+    return _currentPage;
+  }
+
+  int _pageStartIndex(int itemCount) {
+    final page = _effectiveCurrentPage(_pageCount(itemCount));
+    return page * _ticketsPerPage;
+  }
+
+  int _pageEndIndex(int itemCount) {
+    final end = _pageStartIndex(itemCount) + _ticketsPerPage;
+    return end > itemCount ? itemCount : end;
+  }
+
+  void _setPage(int page) {
+    final itemCount = _filterTickets(widget.viewModel.tickets).length;
+    final lastPage = _pageCount(itemCount) - 1;
+    final nextPage = page.clamp(0, lastPage);
+    if (nextPage == _currentPage) {
+      return;
+    }
+
+    setState(() {
+      _currentPage = nextPage;
+    });
+  }
+
+  void _resetPage() {
+    setState(() {
+      _currentPage = 0;
+    });
+  }
+}
+
+enum _TicketSortOption {
+  newestFirst('Newest first'),
+  oldestFirst('Oldest first'),
+  priorityHighFirst('Priority: high first'),
+  status('Status');
+
+  const _TicketSortOption(this.label);
+
+  final String label;
+}
+
+class _TicketListControls extends StatelessWidget {
+  const _TicketListControls({
+    required this.controller,
+    required this.sortOption,
+    required this.resultCount,
+    required this.totalCount,
+    required this.onSearchChanged,
+    required this.onClearSearch,
+    required this.onSortChanged,
+  });
+
+  final TextEditingController controller;
+  final _TicketSortOption sortOption;
+  final int resultCount;
+  final int totalCount;
+  final ValueChanged<String> onSearchChanged;
+  final VoidCallback? onClearSearch;
+  final ValueChanged<_TicketSortOption?> onSortChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        TextField(
+          controller: controller,
+          textInputAction: TextInputAction.search,
+          decoration: InputDecoration(
+            labelText: 'Search tickets',
+            prefixIcon: const Icon(Icons.search),
+            suffixIcon: IconButton(
+              tooltip: 'Clear search',
+              onPressed: onClearSearch,
+              icon: const Icon(Icons.clear),
+            ),
+            border: const OutlineInputBorder(),
+          ),
+          onChanged: onSearchChanged,
+        ),
+        const SizedBox(height: 12),
+        Row(
+          children: [
+            Expanded(
+              child: DropdownButtonFormField<_TicketSortOption>(
+                initialValue: sortOption,
+                decoration: const InputDecoration(
+                  labelText: 'Sort by',
+                  prefixIcon: Icon(Icons.sort),
+                  border: OutlineInputBorder(),
+                ),
+                items: _TicketSortOption.values.map((option) {
+                  return DropdownMenuItem(
+                    value: option,
+                    child: Text(option.label),
+                  );
+                }).toList(),
+                onChanged: onSortChanged,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Text('$resultCount/$totalCount'),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _TicketPaginationControls extends StatelessWidget {
+  const _TicketPaginationControls({
+    required this.currentPage,
+    required this.pageCount,
+    required this.totalItems,
+    required this.startItem,
+    required this.endItem,
+    required this.onFirst,
+    required this.onPrevious,
+    required this.onNext,
+    required this.onLast,
+  });
+
+  final int currentPage;
+  final int pageCount;
+  final int totalItems;
+  final int startItem;
+  final int endItem;
+  final VoidCallback onFirst;
+  final VoidCallback onPrevious;
+  final VoidCallback onNext;
+  final VoidCallback onLast;
+
+  @override
+  Widget build(BuildContext context) {
+    final isFirstPage = currentPage == 0;
+    final isLastPage = currentPage == pageCount - 1;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Column(
+        children: [
+          Text(
+            'Showing $startItem-$endItem of $totalItems tickets',
+            style: textTheme.bodySmall,
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            alignment: WrapAlignment.center,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 4,
+            runSpacing: 4,
+            children: [
+              IconButton(
+                tooltip: 'First page',
+                onPressed: isFirstPage ? null : onFirst,
+                icon: const Icon(Icons.first_page),
+              ),
+              IconButton(
+                tooltip: 'Previous page',
+                onPressed: isFirstPage ? null : onPrevious,
+                icon: const Icon(Icons.chevron_left),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 8),
+                child: Text(
+                  'Page ${currentPage + 1} of $pageCount',
+                  style: textTheme.bodyMedium,
+                ),
+              ),
+              IconButton(
+                tooltip: 'Next page',
+                onPressed: isLastPage ? null : onNext,
+                icon: const Icon(Icons.chevron_right),
+              ),
+              IconButton(
+                tooltip: 'Last page',
+                onPressed: isLastPage ? null : onLast,
+                icon: const Icon(Icons.last_page),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -215,47 +549,126 @@ class _TicketTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final statusStyle = _TicketStatusStyle.fromStatus(
+      TicketStatus.fromValue(ticket.status),
+    );
+
     return Card(
-      child: ListTile(
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
         onTap: onTap,
-        title: Text(ticket.title),
-        subtitle: Padding(
-          padding: const EdgeInsets.only(top: 8),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        child: IntrinsicHeight(
+          child: Row(
             children: [
-              Text(
-                ticket.description,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
+              Container(width: 6, color: statusStyle.color),
+              Expanded(
+                child: ListTile(
+                  title: Text(ticket.title),
+                  subtitle: Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          ticket.description,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            _StatusChip(
+                              label: ticket.status,
+                              icon: statusStyle.icon,
+                              color: statusStyle.color,
+                            ),
+                            Chip(
+                              visualDensity: VisualDensity.compact,
+                              label: Text(ticket.priority),
+                            ),
+                            Chip(
+                              visualDensity: VisualDensity.compact,
+                              label: Text(ticket.issueType),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text('Created ${_formatDate(ticket.createdAt)}'),
+                      ],
+                    ),
+                  ),
+                  trailing: Icon(
+                    Icons.chevron_right,
+                    color: colorScheme.primary,
+                  ),
+                ),
               ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  Chip(
-                    visualDensity: VisualDensity.compact,
-                    label: Text(ticket.status),
-                  ),
-                  Chip(
-                    visualDensity: VisualDensity.compact,
-                    label: Text(ticket.priority),
-                  ),
-                  Chip(
-                    visualDensity: VisualDensity.compact,
-                    label: Text(ticket.issueType),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Text('Created ${_formatDate(ticket.createdAt)}'),
             ],
           ),
         ),
-        trailing: Icon(Icons.chevron_right, color: colorScheme.primary),
       ),
     );
+  }
+}
+
+class _StatusChip extends StatelessWidget {
+  const _StatusChip({
+    required this.label,
+    required this.icon,
+    required this.color,
+  });
+
+  final String label;
+  final IconData icon;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Chip(
+      avatar: Icon(icon, size: 16, color: color),
+      label: Text(label),
+      visualDensity: VisualDensity.compact,
+      backgroundColor: color.withValues(alpha: 0.12),
+      side: BorderSide(color: color.withValues(alpha: 0.45)),
+    );
+  }
+}
+
+class _TicketStatusStyle {
+  const _TicketStatusStyle({required this.color, required this.icon});
+
+  final Color color;
+  final IconData icon;
+
+  static _TicketStatusStyle fromStatus(TicketStatus status) {
+    return switch (status) {
+      TicketStatus.submitted => const _TicketStatusStyle(
+        color: Color(0xFF2563EB),
+        icon: Icons.inbox_outlined,
+      ),
+      TicketStatus.assigned => const _TicketStatusStyle(
+        color: Color(0xFF7C3AED),
+        icon: Icons.assignment_ind_outlined,
+      ),
+      TicketStatus.processing => const _TicketStatusStyle(
+        color: Color(0xFFD97706),
+        icon: Icons.sync,
+      ),
+      TicketStatus.resolved => const _TicketStatusStyle(
+        color: Color(0xFF059669),
+        icon: Icons.task_alt,
+      ),
+      TicketStatus.closed => const _TicketStatusStyle(
+        color: Color(0xFF475569),
+        icon: Icons.lock_outline,
+      ),
+      TicketStatus.cancelled => const _TicketStatusStyle(
+        color: Color(0xFFDC2626),
+        icon: Icons.cancel_outlined,
+      ),
+    };
   }
 }
 

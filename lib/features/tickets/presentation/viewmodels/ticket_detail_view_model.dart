@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../application/services/i_ticket_service.dart';
 import '../../domain/entities/ticket.dart';
+import '../../domain/entities/ticket_status_note.dart';
 
 enum TicketDetailStatus { initial, loading, success, failure }
 
@@ -13,6 +14,7 @@ class TicketDetailViewModel extends ChangeNotifier {
   TicketDetailStatus _status = TicketDetailStatus.initial;
   String? _errorMessage;
   Ticket? _ticket;
+  List<TicketStatusNote> _statusNotes = const [];
 
   TicketDetailStatus get status => _status;
 
@@ -22,6 +24,8 @@ class TicketDetailViewModel extends ChangeNotifier {
 
   Ticket? get ticket => _ticket;
 
+  List<TicketStatusNote> get statusNotes => List.unmodifiable(_statusNotes);
+
   Future<void> loadTicket(int id) async {
     _status = TicketDetailStatus.loading;
     _errorMessage = null;
@@ -29,6 +33,7 @@ class TicketDetailViewModel extends ChangeNotifier {
 
     try {
       _ticket = await _ticketService.getTicketById(id);
+      _statusNotes = await _ticketService.getStatusNotesByTicketId(id);
       _status = TicketDetailStatus.success;
     } catch (error) {
       _status = TicketDetailStatus.failure;
@@ -77,6 +82,7 @@ class TicketDetailViewModel extends ChangeNotifier {
         note: note,
         solutionSummary: solutionSummary,
       );
+      _statusNotes = await _ticketService.getStatusNotesByTicketId(ticketId);
       _status = TicketDetailStatus.success;
       notifyListeners();
       return true;

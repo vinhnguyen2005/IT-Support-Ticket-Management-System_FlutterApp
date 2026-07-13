@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:file_picker/file_picker.dart';
 
 import '../../../../core/enums/issue_type.dart';
 import '../../../../core/enums/priority_level.dart';
@@ -50,25 +49,44 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
   }
 
   Future<void> _pickFile() async {
-    try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.image,
-        allowMultiple: false,
-      );
-      if (result != null && result.files.isNotEmpty) {
-        final file = result.files.first;
-        setState(() {
-          _selectedFileName = file.name;
-          _attachmentController.text = file.path ?? file.name;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error picking image: $e')),
+    final attachmentPath = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        final controller = TextEditingController(
+          text: _attachmentController.text,
         );
-      }
+        return AlertDialog(
+          title: const Text('Attachment path'),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            decoration: const InputDecoration(
+              labelText: 'Image file path or URL',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, controller.text.trim()),
+              child: const Text('Use attachment'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (attachmentPath == null) {
+      return;
     }
+
+    setState(() {
+      _selectedFileName = _fileNameFromPath(attachmentPath);
+      _attachmentController.text = attachmentPath;
+    });
   }
 
   Future<void> _submit(CreateTicketViewModel viewModel) async {
@@ -222,7 +240,8 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
                             decoration: InputDecoration(
                               labelText: 'Attachment',
                               border: const OutlineInputBorder(),
-                              hintText: _selectedFileName ?? 'No image selected',
+                              hintText:
+                                  _selectedFileName ?? 'No image selected',
                               filled: true,
                               fillColor: Colors.grey[100],
                             ),
@@ -276,4 +295,13 @@ Future<ITicketService> _createTicketService() async {
       mapper: const TicketMapper(),
     ),
   );
+}
+
+String? _fileNameFromPath(String path) {
+  if (path.isEmpty) {
+    return null;
+  }
+
+  final normalizedPath = path.replaceAll('\\', '/');
+  return normalizedPath.split('/').last;
 }

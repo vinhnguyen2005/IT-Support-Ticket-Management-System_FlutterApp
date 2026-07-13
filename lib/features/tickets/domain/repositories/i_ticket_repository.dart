@@ -1,6 +1,7 @@
 import '../../../../core/enums/issue_type.dart';
 import '../../../../core/enums/priority_level.dart';
 import '../entities/ticket.dart';
+import '../entities/ticket_status_note.dart';
 
 abstract interface class ITicketRepository {
   Future<List<Ticket>> getTickets();
@@ -10,6 +11,8 @@ abstract interface class ITicketRepository {
   Future<List<Ticket>> getTicketsByAssignee(int assigneeId);
 
   Future<Ticket?> getTicketById(int id);
+
+  Future<List<TicketStatusNote>> getStatusNotesByTicketId(int ticketId);
 
   Future<Ticket> createTicket({
     required String title,

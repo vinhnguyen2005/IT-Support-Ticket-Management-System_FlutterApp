@@ -90,6 +90,20 @@ class TicketLocalDataSourceImpl implements ITicketLocalDataSource {
   }
 
   @override
+  Future<List<UpdateTicketStatusDto>> getStatusNotesByTicketId(
+    int ticketId,
+  ) async {
+    final rows = await _database.query(
+      AppDatabase.ticketStatusHistoriesTable,
+      where: 'ticketId = ?',
+      whereArgs: [ticketId],
+      orderBy: 'changedAt DESC',
+    );
+
+    return rows.map(UpdateTicketStatusDto.fromMap).toList();
+  }
+
+  @override
   Future<int> updateTicket(TicketDto ticket) async {
     final id = ticket.id;
     if (id == null) {

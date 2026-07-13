@@ -12,6 +12,8 @@ abstract interface class ITicketLocalDataSource {
 
   Future<TicketDto?> getTicketById(int id);
 
+  Future<List<UpdateTicketStatusDto>> getStatusNotesByTicketId(int ticketId);
+
   Future<int> updateTicket(TicketDto ticket);
 
   Future<void> updateTicketStatus(UpdateTicketStatusDto statusUpdate);

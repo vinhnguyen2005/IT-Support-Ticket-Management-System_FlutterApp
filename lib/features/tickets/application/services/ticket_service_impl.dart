@@ -2,6 +2,7 @@ import '../../../../core/enums/issue_type.dart';
 import '../../../../core/enums/priority_level.dart';
 import '../../../../core/errors/exceptions.dart';
 import '../../domain/entities/ticket.dart';
+import '../../domain/entities/ticket_status_note.dart';
 import '../../domain/repositories/i_ticket_repository.dart';
 import 'i_ticket_service.dart';
 
@@ -31,6 +32,12 @@ class TicketServiceImpl implements ITicketService {
   Future<Ticket?> getTicketById(int id) {
     _validateId(id, 'Ticket id is required.');
     return _ticketRepository.getTicketById(id);
+  }
+
+  @override
+  Future<List<TicketStatusNote>> getStatusNotesByTicketId(int ticketId) {
+    _validateId(ticketId, 'Ticket id is required.');
+    return _ticketRepository.getStatusNotesByTicketId(ticketId);
   }
 
   @override

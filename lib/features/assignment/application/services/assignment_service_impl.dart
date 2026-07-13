@@ -12,8 +12,8 @@ class AssignmentServiceImpl implements IAssignmentService {
 
   static const Map<TicketStatus, Set<TicketStatus>> _staffTransitions = {
     TicketStatus.submitted: {TicketStatus.assigned},
-    TicketStatus.assigned: {TicketStatus.processing, TicketStatus.resolved},
-    TicketStatus.processing: {TicketStatus.resolved},
+    TicketStatus.assigned: {TicketStatus.processing, TicketStatus.closed},
+    TicketStatus.processing: {TicketStatus.closed},
   };
 
   @override
@@ -125,11 +125,11 @@ class AssignmentServiceImpl implements IAssignmentService {
     }
 
     final normalizedSolutionSummary = solutionSummary?.trim();
-    if (parsedStatus == TicketStatus.resolved &&
+    if (parsedStatus == TicketStatus.closed &&
         (normalizedSolutionSummary == null ||
             normalizedSolutionSummary.isEmpty)) {
       throw const AppException(
-        'Solution summary is required when resolving a ticket.',
+        'Completion summary is required when closing a ticket.',
       );
     }
 

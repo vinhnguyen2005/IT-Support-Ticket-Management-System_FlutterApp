@@ -1,7 +1,6 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:file_picker/file_picker.dart';
 
 import '../../../../core/di/service_locator.dart';
 import '../../../../core/enums/issue_type.dart';
@@ -13,6 +12,7 @@ import '../../application/services/ticket_service_impl.dart';
 import '../../data/mappers/ticket_mapper.dart';
 import '../../data/repositories/ticket_repository_impl.dart';
 import '../../domain/entities/ticket.dart';
+import '../../domain/entities/ticket_status_note.dart';
 import '../viewmodels/ticket_detail_view_model.dart';
 import '../../../comments/presentation/viewmodels/comment_view_model.dart';
 import '../../../comments/presentation/views/comment_section.dart';
@@ -117,25 +117,44 @@ class _TicketDetailPageState extends State<TicketDetailPage>
   }
 
   Future<void> _pickFile() async {
-    try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.image,
-        allowMultiple: false,
-      );
-      if (result != null && result.files.isNotEmpty) {
-        final file = result.files.first;
-        setState(() {
-          _selectedFileName = file.name;
-          _attachmentController.text = file.path ?? file.name;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('Error picking image: $e')));
-      }
+    final attachmentPath = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        final controller = TextEditingController(
+          text: _attachmentController.text,
+        );
+        return AlertDialog(
+          title: const Text('Attachment path'),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            decoration: const InputDecoration(
+              labelText: 'Image file path or URL',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, controller.text.trim()),
+              child: const Text('Use attachment'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (attachmentPath == null) {
+      return;
     }
+
+    setState(() {
+      _selectedFileName = _fileNameFromPath(attachmentPath);
+      _attachmentController.text = attachmentPath;
+    });
   }
 
   Future<void> _save(TicketDetailViewModel viewModel, Ticket ticket) async {
@@ -289,11 +308,6 @@ class _TicketDetailPageState extends State<TicketDetailPage>
             final canEdit =
                 ticket != null && isRequester && !isClosed && !isCancelled;
             final canGiveFeedback = ticket != null && isRequester && isClosed;
-            final canConfirmResolved =
-                ticket != null &&
-                isRequester &&
-                viewer.role == UserRole.user &&
-                TicketStatus.fromValue(ticket.status) == TicketStatus.resolved;
             final canCancel =
                 ticket != null &&
                 viewer.role == UserRole.admin &&
@@ -307,21 +321,6 @@ class _TicketDetailPageState extends State<TicketDetailPage>
               appBar: AppBar(
                 title: const Text('Ticket details'),
                 actions: [
-                  if (canConfirmResolved)
-                    IconButton(
-                      key: const Key('confirm-resolution-button'),
-                      icon: const Icon(Icons.check_circle),
-                      tooltip: 'Confirm resolution',
-                      onPressed: () => _confirmStatusChange(
-                        viewModel,
-                        ticket,
-                        viewer,
-                        status: TicketStatus.closed,
-                        title: 'Confirm resolution',
-                        message:
-                            'The issue is resolved. Confirm OK and close this ticket?',
-                      ),
-                    ),
                   if (canCancel)
                     IconButton(
                       key: const Key('admin-cancel-ticket-button'),
@@ -374,6 +373,7 @@ class _TicketDetailPageState extends State<TicketDetailPage>
                 viewModel: viewModel,
                 ticketId: widget.ticketId,
                 ticket: ticket,
+                statusNotes: viewModel.statusNotes,
                 titleController: _titleController,
                 descriptionController: _descriptionController,
                 attachmentController: _attachmentController,
@@ -419,6 +419,7 @@ class _TicketDetailBody extends StatelessWidget {
     required this.viewModel,
     required this.ticketId,
     required this.ticket,
+    required this.statusNotes,
     required this.titleController,
     required this.descriptionController,
     required this.attachmentController,
@@ -443,6 +444,7 @@ class _TicketDetailBody extends StatelessWidget {
   final TicketDetailViewModel viewModel;
   final int ticketId;
   final Ticket? ticket;
+  final List<TicketStatusNote> statusNotes;
   final TextEditingController titleController;
   final TextEditingController descriptionController;
   final TextEditingController attachmentController;
@@ -500,15 +502,29 @@ class _TicketDetailBody extends StatelessWidget {
   }
 
   Widget _buildDetailsTab(Ticket ticket, TicketDetailViewModel viewModel) {
+    final statusStyle = _TicketStatusStyle.fromStatus(
+      TicketStatus.fromValue(ticket.status),
+    );
+
     return SafeArea(
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          _StatusSummaryBanner(
+            status: ticket.status,
+            color: statusStyle.color,
+            icon: statusStyle.icon,
+          ),
+          const SizedBox(height: 12),
           Wrap(
             spacing: 8,
             runSpacing: 8,
             children: [
-              Chip(label: Text(ticket.status)),
+              _StatusChip(
+                label: ticket.status,
+                icon: statusStyle.icon,
+                color: statusStyle.color,
+              ),
               Chip(label: Text(ticket.priority)),
               Chip(label: Text(ticket.issueType)),
               Chip(label: Text('Created ${_formatDate(ticket.createdAt)}')),
@@ -581,10 +597,8 @@ class _TicketDetailBody extends StatelessWidget {
             items: [
               const DropdownMenuItem<int?>(value: null, child: Text('None')),
               ..._categoryOptions.map(
-                (c) => DropdownMenuItem<int?>(
-                  value: c.id,
-                  child: Text(c.label),
-                ),
+                (c) =>
+                    DropdownMenuItem<int?>(value: c.id, child: Text(c.label)),
               ),
             ],
             onChanged: !isEditing || viewModel.isLoading
@@ -626,6 +640,12 @@ class _TicketDetailBody extends StatelessWidget {
             const SizedBox(height: 12),
             Text(viewModel.errorMessage!, style: TextStyle(color: Colors.red)),
           ],
+          const SizedBox(height: 24),
+          _StatusNotesSection(
+            status: ticket.status,
+            statusStyle: statusStyle,
+            statusNotes: statusNotes,
+          ),
           if (canViewFeedback && feedback != null) ...[
             const SizedBox(height: 24),
             _FeedbackSummary(feedback: feedback!),
@@ -672,6 +692,168 @@ class _TicketDetailBody extends StatelessWidget {
 }
 
 enum _TicketAction { edit }
+
+class _StatusSummaryBanner extends StatelessWidget {
+  const _StatusSummaryBanner({
+    required this.status,
+    required this.color,
+    required this.icon,
+  });
+
+  final String status;
+  final Color color;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        border: Border(left: BorderSide(color: color, width: 5)),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: color),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'Status: $status',
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StatusChip extends StatelessWidget {
+  const _StatusChip({
+    required this.label,
+    required this.icon,
+    required this.color,
+  });
+
+  final String label;
+  final IconData icon;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Chip(
+      avatar: Icon(icon, size: 16, color: color),
+      label: Text(label),
+      visualDensity: VisualDensity.compact,
+      backgroundColor: color.withValues(alpha: 0.12),
+      side: BorderSide(color: color.withValues(alpha: 0.45)),
+    );
+  }
+}
+
+class _StatusNotesSection extends StatelessWidget {
+  const _StatusNotesSection({
+    required this.status,
+    required this.statusStyle,
+    required this.statusNotes,
+  });
+
+  final String status;
+  final _TicketStatusStyle statusStyle;
+  final List<TicketStatusNote> statusNotes;
+
+  @override
+  Widget build(BuildContext context) {
+    final notesWithText = statusNotes
+        .where((note) => note.note?.trim().isNotEmpty ?? false)
+        .toList(growable: false);
+    final latestNote = notesWithText.isEmpty ? null : notesWithText.first;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Status', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 8),
+        _StatusChip(
+          label: status,
+          icon: statusStyle.icon,
+          color: statusStyle.color,
+        ),
+        const SizedBox(height: 16),
+        Text('Status note', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 8),
+        if (latestNote == null)
+          const Text('No status note available.')
+        else
+          _StatusNoteTile(latestNote),
+        if (notesWithText.length > 1) ...[
+          const SizedBox(height: 8),
+          ...notesWithText.skip(1).map((note) => _StatusNoteTile(note)),
+        ],
+      ],
+    );
+  }
+}
+
+class _StatusNoteTile extends StatelessWidget {
+  const _StatusNoteTile(this.note);
+
+  final TicketStatusNote note;
+
+  @override
+  Widget build(BuildContext context) {
+    final fromStatus = note.fromStatus;
+    final transition = fromStatus == null
+        ? note.toStatus
+        : '$fromStatus to ${note.toStatus}';
+
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: const Icon(Icons.notes_outlined),
+      title: Text(note.note!.trim()),
+      subtitle: Text('$transition - ${_formatDateTime(note.changedAt)}'),
+    );
+  }
+}
+
+class _TicketStatusStyle {
+  const _TicketStatusStyle({required this.color, required this.icon});
+
+  final Color color;
+  final IconData icon;
+
+  static _TicketStatusStyle fromStatus(TicketStatus status) {
+    return switch (status) {
+      TicketStatus.submitted => const _TicketStatusStyle(
+        color: Color(0xFF2563EB),
+        icon: Icons.inbox_outlined,
+      ),
+      TicketStatus.assigned => const _TicketStatusStyle(
+        color: Color(0xFF7C3AED),
+        icon: Icons.assignment_ind_outlined,
+      ),
+      TicketStatus.processing => const _TicketStatusStyle(
+        color: Color(0xFFD97706),
+        icon: Icons.sync,
+      ),
+      TicketStatus.resolved => const _TicketStatusStyle(
+        color: Color(0xFF059669),
+        icon: Icons.task_alt,
+      ),
+      TicketStatus.closed => const _TicketStatusStyle(
+        color: Color(0xFF475569),
+        icon: Icons.lock_outline,
+      ),
+      TicketStatus.cancelled => const _TicketStatusStyle(
+        color: Color(0xFFDC2626),
+        icon: Icons.cancel_outlined,
+      ),
+    };
+  }
+}
 
 class _StatusConfirmationDialog extends StatefulWidget {
   const _StatusConfirmationDialog({
@@ -815,14 +997,6 @@ int? _resolveValidCategoryId(int? categoryId) {
   return null;
 }
 
-final List<String> _knownStatuses = TicketStatus.values
-    .map((status) => status.value)
-    .toList(growable: false);
-
-String _statusLabel(String status) {
-  return TicketStatus.fromValue(status).value;
-}
-
 Future<ITicketService> _createTicketService() async {
   return TicketServiceImpl(
     TicketRepositoryImpl(
@@ -836,4 +1010,19 @@ String _formatDate(DateTime value) {
   return '${value.year.toString().padLeft(4, '0')}-'
       '${value.month.toString().padLeft(2, '0')}-'
       '${value.day.toString().padLeft(2, '0')}';
+}
+
+String _formatDateTime(DateTime value) {
+  return '${_formatDate(value)} '
+      '${value.hour.toString().padLeft(2, '0')}:'
+      '${value.minute.toString().padLeft(2, '0')}';
+}
+
+String? _fileNameFromPath(String path) {
+  if (path.isEmpty) {
+    return null;
+  }
+
+  final normalizedPath = path.replaceAll('\\', '/');
+  return normalizedPath.split('/').last;
 }

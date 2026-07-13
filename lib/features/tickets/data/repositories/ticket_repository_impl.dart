@@ -4,6 +4,7 @@ import '../../../../core/enums/ticket_status.dart';
 import '../../../../core/enums/user_role.dart';
 import '../../../../core/errors/exceptions.dart';
 import '../../domain/entities/ticket.dart';
+import '../../domain/entities/ticket_status_note.dart';
 import '../../domain/repositories/i_ticket_repository.dart';
 import '../datasources/i_ticket_local_data_source.dart';
 import '../dtos/ticket_dto.dart';
@@ -54,6 +55,12 @@ class TicketRepositoryImpl implements ITicketRepository {
     }
 
     return _mapper.mapToEntity(ticket);
+  }
+
+  @override
+  Future<List<TicketStatusNote>> getStatusNotesByTicketId(int ticketId) async {
+    final notes = await _localDataSource.getStatusNotesByTicketId(ticketId);
+    return notes.map(_mapper.mapStatusNoteToEntity).toList();
   }
 
   @override

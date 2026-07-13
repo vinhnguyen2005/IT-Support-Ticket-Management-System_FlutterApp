@@ -20,8 +20,8 @@ class _UpdateProgressPageState extends State<UpdateProgressPage> {
 
   static const Map<TicketStatus, List<TicketStatus>> _staffTransitions = {
     TicketStatus.submitted: [TicketStatus.assigned],
-    TicketStatus.assigned: [TicketStatus.processing, TicketStatus.resolved],
-    TicketStatus.processing: [TicketStatus.resolved],
+    TicketStatus.assigned: [TicketStatus.processing, TicketStatus.closed],
+    TicketStatus.processing: [TicketStatus.closed],
   };
 
   @override
@@ -171,14 +171,14 @@ class _UpdateProgressPageState extends State<UpdateProgressPage> {
                         ? null
                         : (value) => setState(() => _status = value),
                   ),
-                if (selectedStatus == TicketStatus.resolved.value) ...[
+                if (selectedStatus == TicketStatus.closed.value) ...[
                   const SizedBox(height: 16),
                   TextField(
                     controller: _solutionSummaryController,
                     minLines: 3,
                     maxLines: 5,
                     decoration: const InputDecoration(
-                      labelText: 'Solution summary',
+                      labelText: 'Completion summary',
                       border: OutlineInputBorder(),
                     ),
                   ),

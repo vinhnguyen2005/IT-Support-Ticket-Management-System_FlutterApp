@@ -1,5 +1,6 @@
 import '../../../../core/enums/ticket_status.dart';
 import '../../domain/entities/ticket.dart';
+import '../../domain/entities/ticket_status_note.dart';
 import '../dtos/create_ticket_request_dto.dart';
 import '../dtos/ticket_dto.dart';
 import '../dtos/update_ticket_status_dto.dart';
@@ -81,6 +82,16 @@ class TicketMapper {
       newStatus: _normalizeStatus(newStatus),
       changedByUserId: changedByUserId,
       note: note,
+    );
+  }
+
+  TicketStatusNote mapStatusNoteToEntity(UpdateTicketStatusDto dto) {
+    return TicketStatusNote(
+      fromStatus: dto.oldStatus,
+      toStatus: _normalizeStatus(dto.newStatus),
+      changedByUserId: dto.changedByUserId,
+      note: dto.note,
+      changedAt: dto.changedAt,
     );
   }
 

@@ -250,8 +250,8 @@ class AssignmentLocalDataSourceImpl implements IAssignmentLocalDataSource {
         {
           'status': parsedStatus.value,
           'updatedAt': now,
-          if (parsedStatus == TicketStatus.resolved) 'resolvedAt': now,
-          if (parsedStatus == TicketStatus.resolved)
+          if (parsedStatus == TicketStatus.closed) 'resolvedAt': now,
+          if (parsedStatus == TicketStatus.closed)
             'solutionSummary': solutionSummary,
           if (parsedStatus == TicketStatus.closed) 'closedAt': now,
           if (parsedStatus != TicketStatus.closed) 'closedAt': null,
