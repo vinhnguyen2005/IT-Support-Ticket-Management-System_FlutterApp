@@ -11,7 +11,9 @@ class AttachmentLocalDataSourceImpl implements IAttachmentLocalDataSource {
   final Database _database;
 
   @override
-  Future<List<TicketAttachmentDto>> getAttachmentsByTicketId(int ticketId) async {
+  Future<List<TicketAttachmentDto>> getAttachmentsByTicketId(
+    int ticketId,
+  ) async {
     final rows = await _database.rawQuery(
       '''
       SELECT

@@ -26,11 +26,11 @@ void main() {
   });
 
   test(
-    'fresh version 13 schema contains SLA columns, events, and defaults',
+    'fresh version 14 schema contains SLA columns, events, and defaults',
     () async {
       final database = await AppDatabase.instance;
 
-      expect(AppDatabase.databaseVersion, 13);
+      expect(AppDatabase.databaseVersion, 14);
       final ticketColumns = await _columnNames(
         database,
         AppDatabase.ticketsTable,

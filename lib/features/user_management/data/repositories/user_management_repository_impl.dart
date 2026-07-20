@@ -10,8 +10,8 @@ class UserManagementRepositoryImpl implements IUserManagementRepository {
   const UserManagementRepositoryImpl({
     required IUserLocalDataSource localDataSource,
     required UserManagementMapper mapper,
-  })  : _localDataSource = localDataSource,
-        _mapper = mapper;
+  }) : _localDataSource = localDataSource,
+       _mapper = mapper;
 
   final IUserLocalDataSource _localDataSource;
   final UserManagementMapper _mapper;
@@ -79,14 +79,8 @@ class UserManagementRepositoryImpl implements IUserManagementRepository {
   }
 
   @override
-  Future<void> setUserActive({
-    required int id,
-    required bool isActive,
-  }) async {
-    await _localDataSource.setUserActive(
-      id: id,
-      isActive: isActive,
-    );
+  Future<void> setUserActive({required int id, required bool isActive}) async {
+    await _localDataSource.setUserActive(id: id, isActive: isActive);
   }
 
   @override

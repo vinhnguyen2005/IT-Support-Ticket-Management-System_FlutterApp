@@ -14,10 +14,15 @@ class FeedbackLocalDataSourceImpl implements IFeedbackLocalDataSource {
   Future<FeedbackDto?> getFeedbackByTicketId(int ticketId) async {
     final rows = await _database.rawQuery(
       '''
-      SELECT f.*, t.title AS ticketTitle, u.fullName AS userName
+      SELECT f.*, t.title AS ticketTitle,
+        reviewer.fullName AS reviewerName,
+        reviewee.fullName AS revieweeName
       FROM ${AppDatabase.feedbackTable} f
       INNER JOIN ${AppDatabase.ticketsTable} t ON t.id = f.ticketId
-      INNER JOIN ${AppDatabase.usersTable} u ON u.id = f.userId
+      INNER JOIN ${AppDatabase.usersTable} reviewer
+        ON reviewer.id = f.reviewerUserId
+      INNER JOIN ${AppDatabase.usersTable} reviewee
+        ON reviewee.id = f.revieweeUserId
       WHERE f.ticketId = ?
       LIMIT 1
       ''',
@@ -32,17 +37,24 @@ class FeedbackLocalDataSourceImpl implements IFeedbackLocalDataSource {
   }
 
   @override
-  Future<List<FeedbackDto>> getFeedbackByUserId(int userId) async {
+  Future<List<FeedbackDto>> getFeedbackByReviewerUserId(
+    int reviewerUserId,
+  ) async {
     final rows = await _database.rawQuery(
       '''
-      SELECT f.*, t.title AS ticketTitle, u.fullName AS userName
+      SELECT f.*, t.title AS ticketTitle,
+        reviewer.fullName AS reviewerName,
+        reviewee.fullName AS revieweeName
       FROM ${AppDatabase.feedbackTable} f
       INNER JOIN ${AppDatabase.ticketsTable} t ON t.id = f.ticketId
-      INNER JOIN ${AppDatabase.usersTable} u ON u.id = f.userId
-      WHERE f.userId = ?
+      INNER JOIN ${AppDatabase.usersTable} reviewer
+        ON reviewer.id = f.reviewerUserId
+      INNER JOIN ${AppDatabase.usersTable} reviewee
+        ON reviewee.id = f.revieweeUserId
+      WHERE f.reviewerUserId = ?
       ORDER BY f.createdAt DESC
       ''',
-      [userId],
+      [reviewerUserId],
     );
 
     return rows.map(FeedbackDto.fromMap).toList();
@@ -64,7 +76,8 @@ class FeedbackLocalDataSourceImpl implements IFeedbackLocalDataSource {
     final count = await _database.update(
       AppDatabase.feedbackTable,
       {
-        'rating': dto.rating,
+        'staffRating': dto.staffRating,
+        'supportRating': dto.supportRating,
         'comment': dto.comment,
         'updatedAt': dto.updatedAt?.toIso8601String(),
       },

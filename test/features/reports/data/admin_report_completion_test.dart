@@ -113,16 +113,20 @@ void main() {
       await database.insert(AppDatabase.feedbackTable, {
         'id': 1,
         'ticketId': 3,
-        'userId': 1,
-        'rating': 1,
+        'reviewerUserId': 1,
+        'revieweeUserId': 2,
+        'staffRating': 2,
+        'supportRating': 1,
         'comment': 'Too slow',
         'createdAt': now.subtract(const Duration(days: 10)).toIso8601String(),
       });
       await database.insert(AppDatabase.feedbackTable, {
         'id': 2,
         'ticketId': 2,
-        'userId': 1,
-        'rating': 5,
+        'reviewerUserId': 1,
+        'revieweeUserId': 2,
+        'staffRating': 4,
+        'supportRating': 5,
         'comment': 'Great',
         'createdAt': now.toIso8601String(),
       });
@@ -218,8 +222,10 @@ Future<Database> _openReportDatabase() {
           CREATE TABLE ${AppDatabase.feedbackTable} (
             id INTEGER PRIMARY KEY,
             ticketId INTEGER NOT NULL UNIQUE,
-            userId INTEGER NOT NULL,
-            rating INTEGER NOT NULL,
+            reviewerUserId INTEGER NOT NULL,
+            revieweeUserId INTEGER NOT NULL,
+            staffRating INTEGER NOT NULL,
+            supportRating INTEGER NOT NULL,
             comment TEXT,
             createdAt TEXT NOT NULL
           )

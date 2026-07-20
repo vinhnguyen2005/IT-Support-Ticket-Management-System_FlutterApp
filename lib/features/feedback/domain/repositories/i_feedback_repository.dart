@@ -3,12 +3,14 @@ import '../entities/feedback.dart';
 abstract interface class IFeedbackRepository {
   Future<Feedback?> getFeedbackByTicketId(int ticketId);
 
-  Future<List<Feedback>> getFeedbackByUserId(int userId);
+  Future<List<Feedback>> getFeedbackByReviewerUserId(int reviewerUserId);
 
   Future<Feedback> submitFeedback({
     required int ticketId,
-    required int userId,
-    required int rating,
+    required int reviewerUserId,
+    required int revieweeUserId,
+    required int staffRating,
+    required int supportRating,
     String? comment,
   });
 

@@ -6,10 +6,8 @@ import '../../../tickets/application/services/i_ticket_service.dart';
 import 'i_feedback_service.dart';
 
 class FeedbackServiceImpl implements IFeedbackService {
-  const FeedbackServiceImpl(
-    this._repository, {
-    ITicketService? ticketService,
-  }) : _ticketService = ticketService;
+  const FeedbackServiceImpl(this._repository, {ITicketService? ticketService})
+    : _ticketService = ticketService;
 
   final IFeedbackRepository _repository;
   final ITicketService? _ticketService;
@@ -23,28 +21,41 @@ class FeedbackServiceImpl implements IFeedbackService {
   }
 
   @override
-  Future<List<Feedback>> getFeedbackByUserId(int userId) {
-    _validatePositiveId(userId, 'User');
-    return _repository.getFeedbackByUserId(userId);
+  Future<List<Feedback>> getFeedbackByReviewerUserId(int reviewerUserId) {
+    _validatePositiveId(reviewerUserId, 'Reviewer');
+    return _repository.getFeedbackByReviewerUserId(reviewerUserId);
   }
 
   @override
   Future<Feedback> submitFeedback({
     required int ticketId,
-    required int userId,
-    required int rating,
+    required int reviewerUserId,
+    required int revieweeUserId,
+    required int staffRating,
+    required int supportRating,
     String? comment,
   }) async {
     _validatePositiveId(ticketId, 'Ticket');
-    _validatePositiveId(userId, 'User');
-    _validateRating(rating);
+    _validatePositiveId(reviewerUserId, 'Reviewer');
+    _validatePositiveId(revieweeUserId, 'Reviewee');
+    if (reviewerUserId == revieweeUserId) {
+      throw ArgumentError('Reviewer and reviewee must be different users');
+    }
+    _validateRating(staffRating);
+    _validateRating(supportRating);
     final normalizedComment = _normalizeComment(comment);
-    await _validateTicketCanReceiveFeedback(ticketId, userId);
+    await _validateTicketCanReceiveFeedback(
+      ticketId,
+      reviewerUserId,
+      revieweeUserId,
+    );
 
     return _repository.submitFeedback(
       ticketId: ticketId,
-      userId: userId,
-      rating: rating,
+      reviewerUserId: reviewerUserId,
+      revieweeUserId: revieweeUserId,
+      staffRating: staffRating,
+      supportRating: supportRating,
       comment: normalizedComment,
     );
   }
@@ -56,20 +67,26 @@ class FeedbackServiceImpl implements IFeedbackService {
       throw ArgumentError('Feedback id must be greater than 0');
     }
     _validatePositiveId(feedback.ticketId, 'Ticket');
-    _validatePositiveId(feedback.userId, 'User');
-    _validateRating(feedback.rating);
+    _validatePositiveId(feedback.reviewerUserId, 'Reviewer');
+    _validatePositiveId(feedback.revieweeUserId, 'Reviewee');
+    _validateRating(feedback.staffRating);
+    _validateRating(feedback.supportRating);
     final normalizedComment = _normalizeComment(feedback.comment);
     await _validateTicketCanReceiveFeedback(
       feedback.ticketId,
-      feedback.userId,
+      feedback.reviewerUserId,
+      feedback.revieweeUserId,
     );
 
     final stored = await _repository.getFeedbackByTicketId(feedback.ticketId);
     if (stored == null || stored.id != feedbackId) {
       throw const AppException('Feedback not found.');
     }
-    if (stored.userId != feedback.userId) {
+    if (stored.reviewerUserId != feedback.reviewerUserId) {
       throw const AppException('You can only update your own feedback.');
+    }
+    if (stored.revieweeUserId != feedback.revieweeUserId) {
+      throw const AppException('The rated staff member cannot be changed.');
     }
 
     await _repository.updateFeedback(
@@ -85,7 +102,8 @@ class FeedbackServiceImpl implements IFeedbackService {
 
   Future<void> _validateTicketCanReceiveFeedback(
     int ticketId,
-    int userId,
+    int reviewerUserId,
+    int revieweeUserId,
   ) async {
     final ticketService = _ticketService;
     if (ticketService == null) return;
@@ -99,10 +117,16 @@ class FeedbackServiceImpl implements IFeedbackService {
         'Feedback can only be submitted after the ticket is closed.',
       );
     }
-    if (ticket.requestedId != userId) {
+    if (ticket.requestedId != reviewerUserId) {
       throw const AppException(
         'Only the ticket requester can submit feedback.',
       );
+    }
+    if (ticket.assignedId == null) {
+      throw const AppException('Ticket has no assigned staff member.');
+    }
+    if (ticket.assignedId != revieweeUserId) {
+      throw const AppException('Feedback must rate the assigned staff member.');
     }
   }
 

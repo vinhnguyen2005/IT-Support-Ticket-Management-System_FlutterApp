@@ -33,10 +33,7 @@ class UserListViewModel extends ChangeNotifier {
     }
   }
 
-  Future<void> setUserActive({
-    required int id,
-    required bool isActive,
-  }) async {
+  Future<void> setUserActive({required int id, required bool isActive}) async {
     try {
       await _service.setUserActive(id: id, isActive: isActive);
       await loadUsers();

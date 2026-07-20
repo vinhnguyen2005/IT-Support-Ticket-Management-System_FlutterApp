@@ -9,8 +9,8 @@ class AuthRepositoryImpl implements IAuthRepository {
   const AuthRepositoryImpl({
     required IAuthLocalDataSource localDataSource,
     required UserMapper userMapper,
-  })  : _localDataSource = localDataSource,
-        _userMapper = userMapper;
+  }) : _localDataSource = localDataSource,
+       _userMapper = userMapper;
 
   final IAuthLocalDataSource _localDataSource;
   final UserMapper _userMapper;
@@ -21,10 +21,7 @@ class AuthRepositoryImpl implements IAuthRepository {
     required String password,
   }) async {
     final response = await _localDataSource.login(
-      LoginRequestDto(
-        username: username,
-        password: password,
-      ),
+      LoginRequestDto(username: username, password: password),
     );
 
     return _userMapper.mapToEntity(response.user);

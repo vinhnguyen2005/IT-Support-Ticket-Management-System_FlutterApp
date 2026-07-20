@@ -14,9 +14,13 @@ class CategoryServiceImpl implements ICategoryService {
   }
 
   @override
-  Future<void> createCategory(String name, String defaultPriority, bool isActive) async {
+  Future<void> createCategory(
+    String name,
+    String defaultPriority,
+    bool isActive,
+  ) async {
     if (name.trim().isEmpty) throw Exception('Category name cannot be empty');
-    
+
     final dto = CategoryDto(
       id: 0, // SQLite auto-increments
       categoryName: name.trim(),
@@ -27,9 +31,14 @@ class CategoryServiceImpl implements ICategoryService {
   }
 
   @override
-  Future<void> editCategory(int id, String name, String defaultPriority, bool isActive) async {
+  Future<void> editCategory(
+    int id,
+    String name,
+    String defaultPriority,
+    bool isActive,
+  ) async {
     if (name.trim().isEmpty) throw Exception('Category name cannot be empty');
-    
+
     final dto = CategoryDto(
       id: id,
       categoryName: name.trim(),

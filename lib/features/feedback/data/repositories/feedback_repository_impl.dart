@@ -22,16 +22,20 @@ class FeedbackRepositoryImpl implements IFeedbackRepository {
   }
 
   @override
-  Future<List<Feedback>> getFeedbackByUserId(int userId) async {
-    final dtos = await _localDataSource.getFeedbackByUserId(userId);
+  Future<List<Feedback>> getFeedbackByReviewerUserId(int reviewerUserId) async {
+    final dtos = await _localDataSource.getFeedbackByReviewerUserId(
+      reviewerUserId,
+    );
     return dtos.map(_mapper.mapToEntity).toList();
   }
 
   @override
   Future<Feedback> submitFeedback({
     required int ticketId,
-    required int userId,
-    required int rating,
+    required int reviewerUserId,
+    required int revieweeUserId,
+    required int staffRating,
+    required int supportRating,
     String? comment,
   }) async {
     final now = DateTime.now();
@@ -47,8 +51,10 @@ class FeedbackRepositoryImpl implements IFeedbackRepository {
     final id = await _localDataSource.insertFeedback(
       FeedbackDto(
         ticketId: ticketId,
-        userId: userId,
-        rating: rating,
+        reviewerUserId: reviewerUserId,
+        revieweeUserId: revieweeUserId,
+        staffRating: staffRating,
+        supportRating: supportRating,
         comment: comment,
         createdAt: now,
       ),
@@ -57,8 +63,10 @@ class FeedbackRepositoryImpl implements IFeedbackRepository {
     return Feedback(
       id: id,
       ticketId: ticketId,
-      userId: userId,
-      rating: rating,
+      reviewerUserId: reviewerUserId,
+      revieweeUserId: revieweeUserId,
+      staffRating: staffRating,
+      supportRating: supportRating,
       comment: comment,
       createdAt: now,
     );
@@ -67,11 +75,7 @@ class FeedbackRepositoryImpl implements IFeedbackRepository {
   @override
   Future<void> updateFeedback(Feedback feedback) async {
     await _localDataSource.updateFeedback(
-      _mapper
-          .mapToDto(feedback)
-          .copyWith(
-            updatedAt: DateTime.now(),
-          ),
+      _mapper.mapToDto(feedback).copyWith(updatedAt: DateTime.now()),
     );
   }
 

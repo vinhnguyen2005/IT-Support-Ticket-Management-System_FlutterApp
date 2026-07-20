@@ -8,13 +8,16 @@ class FeedbackMapper {
     return Feedback(
       id: dto.id,
       ticketId: dto.ticketId,
-      userId: dto.userId,
-      rating: dto.rating,
+      reviewerUserId: dto.reviewerUserId,
+      revieweeUserId: dto.revieweeUserId,
+      staffRating: dto.staffRating,
+      supportRating: dto.supportRating,
       comment: dto.comment,
       createdAt: dto.createdAt,
       updatedAt: dto.updatedAt,
       ticketTitle: dto.ticketTitle,
-      userName: dto.userName,
+      reviewerName: dto.reviewerName,
+      revieweeName: dto.revieweeName,
     );
   }
 
@@ -22,13 +25,16 @@ class FeedbackMapper {
     return FeedbackDto(
       id: feedback.id,
       ticketId: feedback.ticketId,
-      userId: feedback.userId,
-      rating: feedback.rating,
+      reviewerUserId: feedback.reviewerUserId,
+      revieweeUserId: feedback.revieweeUserId,
+      staffRating: feedback.staffRating,
+      supportRating: feedback.supportRating,
       comment: feedback.comment,
       createdAt: feedback.createdAt,
       updatedAt: feedback.updatedAt,
       ticketTitle: feedback.ticketTitle,
-      userName: feedback.userName,
+      reviewerName: feedback.reviewerName,
+      revieweeName: feedback.revieweeName,
     );
   }
 }

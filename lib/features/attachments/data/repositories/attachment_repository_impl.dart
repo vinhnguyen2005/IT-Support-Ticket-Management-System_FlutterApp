@@ -8,8 +8,8 @@ class AttachmentRepositoryImpl implements IAttachmentRepository {
   const AttachmentRepositoryImpl({
     required IAttachmentLocalDataSource localDataSource,
     required AttachmentMapper mapper,
-  })  : _localDataSource = localDataSource,
-        _mapper = mapper;
+  }) : _localDataSource = localDataSource,
+       _mapper = mapper;
 
   final IAttachmentLocalDataSource _localDataSource;
   final AttachmentMapper _mapper;

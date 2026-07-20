@@ -9,11 +9,7 @@ void main() {
   testWidgets('Login page renders sign in form', (WidgetTester tester) async {
     final viewModel = LoginViewModel(_FakeAuthService());
 
-    await tester.pumpWidget(
-      MaterialApp(
-        home: LoginPage(viewModel: viewModel),
-      ),
-    );
+    await tester.pumpWidget(MaterialApp(home: LoginPage(viewModel: viewModel)));
 
     expect(find.text('Sign in'), findsWidgets);
     expect(find.text('Username or email'), findsOneWidget);

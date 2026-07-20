@@ -38,6 +38,7 @@ dependencies:
   path: ^1.9.1
   crypto: ^3.0.7
   file_picker: ^8.0.0
+  image_picker: ^1.2.1
   provider: ^6.1.5+1
 
 dev_dependencies:

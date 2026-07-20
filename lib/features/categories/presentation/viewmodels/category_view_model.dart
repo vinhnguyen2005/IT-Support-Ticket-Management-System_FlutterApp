@@ -26,7 +26,12 @@ class CategoryViewModel extends ChangeNotifier {
     }
   }
 
-  Future<bool> saveCategory(int? id, String name, String priority, bool isActive) async {
+  Future<bool> saveCategory(
+    int? id,
+    String name,
+    String priority,
+    bool isActive,
+  ) async {
     try {
       if (id == null) {
         await categoryService.createCategory(name, priority, isActive);

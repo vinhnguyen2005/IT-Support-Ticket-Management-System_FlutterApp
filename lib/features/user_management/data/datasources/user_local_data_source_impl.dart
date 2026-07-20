@@ -57,10 +57,7 @@ class UserLocalDataSourceImpl implements IUserLocalDataSource {
   }
 
   @override
-  Future<int> setUserActive({
-    required int id,
-    required bool isActive,
-  }) {
+  Future<int> setUserActive({required int id, required bool isActive}) {
     return _database.update(
       AppDatabase.usersTable,
       {

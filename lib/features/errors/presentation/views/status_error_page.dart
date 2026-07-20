@@ -34,13 +34,17 @@ class ClientErrorPage extends StatelessWidget {
   };
 
   static String _messageFor(int statusCode) => switch (statusCode) {
-    400 => 'The request was invalid. Please check your information and try again.',
+    400 =>
+      'The request was invalid. Please check your information and try again.',
     401 => 'Your session may have expired. Please sign in and try again.',
     403 => 'You do not have permission to view this page.',
     404 => 'The page you requested does not exist or may have been moved.',
-    408 => 'The request took too long. Please check your connection and try again.',
-    429 => 'There have been too many requests. Please wait a moment and try again.',
-    _ => 'Something was wrong with the request. Please review it and try again.',
+    408 =>
+      'The request took too long. Please check your connection and try again.',
+    429 =>
+      'There have been too many requests. Please wait a moment and try again.',
+    _ =>
+      'Something was wrong with the request. Please review it and try again.',
   };
 
   static IconData _iconFor(int statusCode) => switch (statusCode) {
@@ -70,7 +74,8 @@ class ServerErrorPage extends StatelessWidget {
     return _StatusErrorPage(
       statusCode: statusCode,
       title: statusCode == 503 ? 'Service unavailable' : 'Server error',
-      message: message ??
+      message:
+          message ??
           (statusCode == 503
               ? 'The service is temporarily unavailable. Please try again shortly.'
               : 'The server encountered a problem. Please try again later.'),
@@ -116,11 +121,7 @@ class _StatusErrorPage extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Icon(
-                        icon,
-                        size: 56,
-                        color: colors.primary,
-                      ),
+                      Icon(icon, size: 56, color: colors.primary),
                       const SizedBox(height: 16),
                       Text(
                         '$statusCode - $title',

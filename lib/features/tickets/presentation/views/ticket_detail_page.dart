@@ -281,14 +281,26 @@ class _TicketDetailPageState extends State<TicketDetailPage>
   void _openFeedbackPage(
     Ticket ticket,
     FeedbackViewModel feedbackVm,
-    int userId,
+    int reviewerUserId,
   ) {
+    final revieweeUserId = ticket.assignedId;
+    if (revieweeUserId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Feedback is unavailable because this ticket has no assigned staff.',
+          ),
+        ),
+      );
+      return;
+    }
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => FeedbackPage(
           ticketId: widget.ticketId,
-          userId: userId,
+          reviewerUserId: reviewerUserId,
+          revieweeUserId: revieweeUserId,
           viewModel: feedbackVm,
         ),
       ),
@@ -343,7 +355,11 @@ class _TicketDetailPageState extends State<TicketDetailPage>
                 isRequester &&
                 viewer.role == UserRole.user &&
                 isResolved;
-            final canGiveFeedback = ticket != null && isRequester && isClosed;
+            final canGiveFeedback =
+                ticket != null &&
+                isRequester &&
+                isClosed &&
+                ticket.assignedId != null;
             final canCancel =
                 ticket != null &&
                 viewer.role == UserRole.admin &&
@@ -1114,11 +1130,13 @@ class _FeedbackSummary extends StatelessWidget {
           children: List.generate(
             5,
             (index) => Icon(
-              index < feedback.rating ? Icons.star : Icons.star_border,
+              index < feedback.staffRating ? Icons.star : Icons.star_border,
               color: Theme.of(context).colorScheme.primary,
             ),
           ),
         ),
+        Text('Staff rating: ${feedback.staffRating}/5'),
+        Text('Support experience: ${feedback.supportRating}/5'),
         if (feedback.comment?.trim().isNotEmpty ?? false) ...[
           const SizedBox(height: 8),
           Text(feedback.comment!),

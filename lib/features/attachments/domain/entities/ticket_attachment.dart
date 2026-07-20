@@ -30,8 +30,7 @@ class TicketAttachment {
     return '${(fileSizeBytes! / (1024 * 1024)).toStringAsFixed(1)} MB';
   }
 
-  bool get isImage =>
-      contentType != null && contentType!.startsWith('image/');
+  bool get isImage => contentType != null && contentType!.startsWith('image/');
 
   bool get isPdf => contentType == 'application/pdf';
 }

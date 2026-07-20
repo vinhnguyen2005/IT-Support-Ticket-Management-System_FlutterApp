@@ -8,8 +8,8 @@ class CommentRepositoryImpl implements ICommentRepository {
   const CommentRepositoryImpl({
     required ICommentLocalDataSource localDataSource,
     required CommentMapper mapper,
-  })  : _localDataSource = localDataSource,
-        _mapper = mapper;
+  }) : _localDataSource = localDataSource,
+       _mapper = mapper;
 
   final ICommentLocalDataSource _localDataSource;
   final CommentMapper _mapper;
@@ -36,13 +36,15 @@ class CommentRepositoryImpl implements ICommentRepository {
       ),
     );
 
-    return TicketComment(
-      id: id,
-      ticketId: ticketId,
-      authorId: authorId,
-      content: content,
-      createdAt: now,
-    );
+    final comments = await _localDataSource.getCommentsByTicketId(ticketId);
+    final insertedComment = comments
+        .where((comment) => comment.id == id)
+        .firstOrNull;
+    if (insertedComment == null) {
+      throw StateError('Inserted comment could not be loaded.');
+    }
+
+    return _mapper.mapToEntity(insertedComment);
   }
 
   @override

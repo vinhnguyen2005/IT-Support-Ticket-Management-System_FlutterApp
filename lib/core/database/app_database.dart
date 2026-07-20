@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 
@@ -10,7 +11,7 @@ class AppDatabase {
   AppDatabase._();
 
   static const String databaseName = 'it_support.db';
-  static const int databaseVersion = 13;
+  static const int databaseVersion = 14;
 
   static const String usersTable = 'users';
   static const String authSessionTable = 'auth_session';
@@ -118,6 +119,9 @@ class AppDatabase {
     }
     if (oldVersion < 13) {
       await _migrateSlaV12ToV13(database);
+    }
+    if (oldVersion < 14) {
+      await _migrateFeedbackV13ToV14(database);
     }
     await _createIndexes(database);
     await seedReferenceData(databaseOverride: database);
@@ -307,13 +311,16 @@ class AppDatabase {
       CREATE TABLE IF NOT EXISTS $feedbackTable (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         ticketId INTEGER NOT NULL UNIQUE,
-        userId INTEGER NOT NULL,
-        rating INTEGER NOT NULL,
+        reviewerUserId INTEGER NOT NULL,
+        revieweeUserId INTEGER NOT NULL,
+        staffRating INTEGER NOT NULL CHECK (staffRating BETWEEN 1 AND 5),
+        supportRating INTEGER NOT NULL CHECK (supportRating BETWEEN 1 AND 5),
         comment TEXT,
         createdAt TEXT NOT NULL,
         updatedAt TEXT,
         FOREIGN KEY (ticketId) REFERENCES $ticketsTable(id) ON DELETE CASCADE,
-        FOREIGN KEY (userId) REFERENCES $usersTable(id)
+        FOREIGN KEY (reviewerUserId) REFERENCES $usersTable(id),
+        FOREIGN KEY (revieweeUserId) REFERENCES $usersTable(id)
       )
     ''');
 
@@ -553,6 +560,73 @@ class AppDatabase {
         whereArgs: [row['id']],
       );
     }
+  }
+
+  static Future<void> _migrateFeedbackV13ToV14(Database database) async {
+    final columns = await _getColumnNames(database, feedbackTable);
+    if (columns.contains('reviewerUserId') &&
+        columns.contains('revieweeUserId') &&
+        columns.contains('staffRating') &&
+        columns.contains('supportRating')) {
+      return;
+    }
+
+    await database.transaction((transaction) async {
+      const legacyTable = 'feedback_v13_legacy';
+      await transaction.execute('DROP TABLE IF EXISTS $legacyTable');
+      await transaction.execute(
+        'ALTER TABLE $feedbackTable RENAME TO $legacyTable',
+      );
+      final omittedRows =
+          Sqflite.firstIntValue(
+            await transaction.rawQuery('''
+              SELECT COUNT(*)
+              FROM $legacyTable f
+              INNER JOIN $ticketsTable t ON t.id = f.ticketId
+              WHERE t.assignedStaffId IS NULL
+            '''),
+          ) ??
+          0;
+      if (omittedRows > 0) {
+        debugPrint(
+          'Feedback migration omitted $omittedRows legacy row(s) because '
+          'their tickets have no assigned staff.',
+        );
+      }
+      await transaction.execute('''
+        CREATE TABLE $feedbackTable (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          ticketId INTEGER NOT NULL UNIQUE,
+          reviewerUserId INTEGER NOT NULL,
+          revieweeUserId INTEGER NOT NULL,
+          staffRating INTEGER NOT NULL CHECK (staffRating BETWEEN 1 AND 5),
+          supportRating INTEGER NOT NULL CHECK (supportRating BETWEEN 1 AND 5),
+          comment TEXT,
+          createdAt TEXT NOT NULL,
+          updatedAt TEXT,
+          FOREIGN KEY (ticketId) REFERENCES $ticketsTable(id) ON DELETE CASCADE,
+          FOREIGN KEY (reviewerUserId) REFERENCES $usersTable(id),
+          FOREIGN KEY (revieweeUserId) REFERENCES $usersTable(id)
+        )
+      ''');
+      await transaction.execute('''
+        INSERT INTO $feedbackTable (
+          id, ticketId, reviewerUserId, revieweeUserId,
+          staffRating, supportRating, comment, createdAt, updatedAt
+        )
+        SELECT f.id, f.ticketId, f.userId, t.assignedStaffId,
+          f.rating, f.rating, f.comment, f.createdAt, f.updatedAt
+        FROM $legacyTable f
+        INNER JOIN $ticketsTable t ON t.id = f.ticketId
+        WHERE t.assignedStaffId IS NOT NULL
+          AND f.rating BETWEEN 1 AND 5
+      ''');
+      await transaction.execute('DROP TABLE $legacyTable');
+      await transaction.execute('''
+        CREATE INDEX IF NOT EXISTS idx_feedback_ticket
+        ON $feedbackTable(ticketId)
+      ''');
+    });
   }
 
   static Future<void> _applySlaPriorityDefaults(

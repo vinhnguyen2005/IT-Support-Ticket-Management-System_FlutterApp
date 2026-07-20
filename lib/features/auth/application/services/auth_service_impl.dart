@@ -9,10 +9,7 @@ class AuthServiceImpl implements IAuthService {
   final IAuthRepository _authRepository;
 
   @override
-  Future<User> login({
-    required String username,
-    required String password,
-  }) {
+  Future<User> login({required String username, required String password}) {
     final normalizedUsername = username.trim();
     if (normalizedUsername.isEmpty) {
       throw const AuthException('Username or email is required.');

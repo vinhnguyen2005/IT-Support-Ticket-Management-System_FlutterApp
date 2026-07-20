@@ -1,119 +1,94 @@
-const _unsetFeedbackDtoField = Object();
-
 class FeedbackDto {
   const FeedbackDto({
     this.id,
     required this.ticketId,
-    required this.userId,
-    required this.rating,
+    required this.reviewerUserId,
+    required this.revieweeUserId,
+    required this.staffRating,
+    required this.supportRating,
     this.comment,
     required this.createdAt,
     this.updatedAt,
     this.ticketTitle,
-    this.userName,
+    this.reviewerName,
+    this.revieweeName,
   });
 
   final int? id;
   final int ticketId;
-  final int userId;
-  final int rating;
+  final int reviewerUserId;
+  final int revieweeUserId;
+  final int staffRating;
+  final int supportRating;
   final String? comment;
   final DateTime createdAt;
   final DateTime? updatedAt;
   final String? ticketTitle;
-  final String? userName;
-
-  factory FeedbackDto.fromMap(Map<String, Object?> map) {
-    return FeedbackDto(
-      id: _readInt(map['id']),
-      ticketId: _readInt(map['ticketId']) ?? 0,
-      userId: _readInt(map['userId']) ?? 0,
-      rating: _readInt(map['rating']) ?? 0,
-      comment: map['comment'] as String?,
-      createdAt: _readDateTime(map['createdAt']) ?? DateTime.now(),
-      updatedAt: _readDateTime(map['updatedAt']),
-      ticketTitle: map['ticketTitle'] as String?,
-      userName: map['userName'] as String?,
-    );
-  }
-
-  Map<String, Object?> toMap() {
-    return {
-      'id': id,
-      'ticketId': ticketId,
-      'userId': userId,
-      'rating': rating,
-      'comment': comment,
-      'createdAt': createdAt.toIso8601String(),
-      'updatedAt': updatedAt?.toIso8601String(),
-    };
-  }
+  final String? reviewerName;
+  final String? revieweeName;
 
   FeedbackDto copyWith({
     int? id,
     int? ticketId,
-    int? userId,
-    int? rating,
-    Object? comment = _unsetFeedbackDtoField,
+    int? reviewerUserId,
+    int? revieweeUserId,
+    int? staffRating,
+    int? supportRating,
+    String? comment,
     DateTime? createdAt,
     DateTime? updatedAt,
     String? ticketTitle,
-    String? userName,
+    String? reviewerName,
+    String? revieweeName,
   }) {
     return FeedbackDto(
       id: id ?? this.id,
       ticketId: ticketId ?? this.ticketId,
-      userId: userId ?? this.userId,
-      rating: rating ?? this.rating,
-      comment: identical(comment, _unsetFeedbackDtoField)
-          ? this.comment
-          : comment as String?,
+      reviewerUserId: reviewerUserId ?? this.reviewerUserId,
+      revieweeUserId: revieweeUserId ?? this.revieweeUserId,
+      staffRating: staffRating ?? this.staffRating,
+      supportRating: supportRating ?? this.supportRating,
+      comment: comment ?? this.comment,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       ticketTitle: ticketTitle ?? this.ticketTitle,
-      userName: userName ?? this.userName,
+      reviewerName: reviewerName ?? this.reviewerName,
+      revieweeName: revieweeName ?? this.revieweeName,
     );
   }
 
-  @override
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        other is FeedbackDto &&
-            other.id == id &&
-            other.ticketId == ticketId &&
-            other.userId == userId &&
-            other.rating == rating &&
-            other.comment == comment &&
-            other.createdAt == createdAt &&
-            other.updatedAt == updatedAt &&
-            other.ticketTitle == ticketTitle &&
-            other.userName == userName;
-  }
-
-  @override
-  int get hashCode => Object.hash(
-    id,
-    ticketId,
-    userId,
-    rating,
-    comment,
-    createdAt,
-    updatedAt,
-    ticketTitle,
-    userName,
+  factory FeedbackDto.fromMap(Map<String, Object?> map) => FeedbackDto(
+    id: _readInt(map['id']),
+    ticketId: _readInt(map['ticketId']) ?? 0,
+    reviewerUserId: _readInt(map['reviewerUserId']) ?? 0,
+    revieweeUserId: _readInt(map['revieweeUserId']) ?? 0,
+    staffRating: _readInt(map['staffRating']) ?? 0,
+    supportRating: _readInt(map['supportRating']) ?? 0,
+    comment: map['comment'] as String?,
+    createdAt: _readDateTime(map['createdAt']) ?? DateTime.now(),
+    updatedAt: _readDateTime(map['updatedAt']),
+    ticketTitle: map['ticketTitle'] as String?,
+    reviewerName: map['reviewerName'] as String?,
+    revieweeName: map['revieweeName'] as String?,
   );
 
-  static int? _readInt(Object? value) {
-    if (value == null) return null;
-    if (value is int) return value;
-    if (value is String) return int.tryParse(value);
-    return null;
-  }
+  Map<String, Object?> toMap() => {
+    'id': id,
+    'ticketId': ticketId,
+    'reviewerUserId': reviewerUserId,
+    'revieweeUserId': revieweeUserId,
+    'staffRating': staffRating,
+    'supportRating': supportRating,
+    'comment': comment,
+    'createdAt': createdAt.toIso8601String(),
+    'updatedAt': updatedAt?.toIso8601String(),
+  };
 
-  static DateTime? _readDateTime(Object? value) {
-    if (value == null) return null;
-    if (value is DateTime) return value;
-    if (value is String) return DateTime.tryParse(value);
-    return null;
-  }
+  static int? _readInt(Object? value) => value is int
+      ? value
+      : value is num
+      ? value.toInt()
+      : int.tryParse('$value');
+  static DateTime? _readDateTime(Object? value) =>
+      value is DateTime ? value : DateTime.tryParse('$value');
 }

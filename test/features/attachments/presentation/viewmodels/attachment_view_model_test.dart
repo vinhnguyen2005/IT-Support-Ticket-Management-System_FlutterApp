@@ -166,7 +166,9 @@ void main() {
       });
 
       test('adds to existing attachments list', () async {
-        mockService.stubGetAttachments([_attachment(id: 1, fileName: 'existing.pdf')]);
+        mockService.stubGetAttachments([
+          _attachment(id: 1, fileName: 'existing.pdf'),
+        ]);
         await viewModel.loadAttachments(1);
 
         mockService.stubAddAttachment(_attachment(id: 2, fileName: 'new.pdf'));
@@ -179,8 +181,10 @@ void main() {
         );
 
         expect(viewModel.attachments.length, 2);
-        expect(viewModel.attachments.map((a) => a.fileName),
-            containsAll(['existing.pdf', 'new.pdf']));
+        expect(
+          viewModel.attachments.map((a) => a.fileName),
+          containsAll(['existing.pdf', 'new.pdf']),
+        );
       });
     });
 
@@ -206,7 +210,9 @@ void main() {
       });
 
       test('handles delete failure', () async {
-        mockService.stubGetAttachments([_attachment(id: 1, fileName: 'first.pdf')]);
+        mockService.stubGetAttachments([
+          _attachment(id: 1, fileName: 'first.pdf'),
+        ]);
         mockService.stubDeleteAttachmentThrow(Exception('Delete failed'));
         await viewModel.loadAttachments(1);
 
@@ -218,7 +224,9 @@ void main() {
       });
 
       test('delete nonexistent attachment', () async {
-        mockService.stubGetAttachments([_attachment(id: 1, fileName: 'first.pdf')]);
+        mockService.stubGetAttachments([
+          _attachment(id: 1, fileName: 'first.pdf'),
+        ]);
         mockService.stubDeleteAttachmentThrow(Exception('Not found'));
         await viewModel.loadAttachments(1);
 
@@ -253,7 +261,6 @@ void main() {
         expect(viewModel.status, AttachmentStatus.failure);
         expect(viewModel.errorMessage, isNotNull);
       });
-
     });
 
     // =========================================================================
@@ -325,7 +332,8 @@ void main() {
         await viewModel.loadAttachments(1);
 
         expect(
-          () => viewModel.attachments.add(_attachment(id: 2, fileName: 'Hacked')),
+          () =>
+              viewModel.attachments.add(_attachment(id: 2, fileName: 'Hacked')),
           throwsA(isA<UnsupportedError>()),
         );
       });
@@ -389,7 +397,9 @@ void main() {
       });
 
       test('delete during load does not corrupt state', () async {
-        mockService.stubGetAttachments([_attachment(id: 1, fileName: 'first.pdf')]);
+        mockService.stubGetAttachments([
+          _attachment(id: 1, fileName: 'first.pdf'),
+        ]);
         await viewModel.loadAttachments(1);
 
         mockService.stubDeleteAttachmentThrow(Exception('Delete failed'));
@@ -440,7 +450,9 @@ void main() {
     });
 
     test('accepts valid fileName and filePath', () async {
-      mockRepository.stubAddAttachment(_attachment(id: 1, fileName: 'valid.pdf'));
+      mockRepository.stubAddAttachment(
+        _attachment(id: 1, fileName: 'valid.pdf'),
+      );
 
       await service.addAttachment(
         ticketId: 1,
@@ -561,10 +573,22 @@ void main() {
   group('TicketAttachment entity', () {
     test('fileSizeFormatted returns correct units', () {
       expect(_attachment(id: 1, fileSizeBytes: 500).fileSizeFormatted, '500 B');
-      expect(_attachment(id: 1, fileSizeBytes: 1024).fileSizeFormatted, '1.0 KB');
-      expect(_attachment(id: 1, fileSizeBytes: 1024 * 500).fileSizeFormatted, '500.0 KB');
-      expect(_attachment(id: 1, fileSizeBytes: 1024 * 1024).fileSizeFormatted, '1.0 MB');
-      expect(_attachment(id: 1, fileSizeBytes: 1024 * 1024 * 5).fileSizeFormatted, '5.0 MB');
+      expect(
+        _attachment(id: 1, fileSizeBytes: 1024).fileSizeFormatted,
+        '1.0 KB',
+      );
+      expect(
+        _attachment(id: 1, fileSizeBytes: 1024 * 500).fileSizeFormatted,
+        '500.0 KB',
+      );
+      expect(
+        _attachment(id: 1, fileSizeBytes: 1024 * 1024).fileSizeFormatted,
+        '1.0 MB',
+      );
+      expect(
+        _attachment(id: 1, fileSizeBytes: 1024 * 1024 * 5).fileSizeFormatted,
+        '5.0 MB',
+      );
     });
 
     test('fileSizeFormatted returns Unknown for null', () {
@@ -575,7 +599,10 @@ void main() {
       expect(_attachment(id: 1, contentType: 'image/png').isImage, isTrue);
       expect(_attachment(id: 1, contentType: 'image/jpeg').isImage, isTrue);
       expect(_attachment(id: 1, contentType: 'image/gif').isImage, isTrue);
-      expect(_attachment(id: 1, contentType: 'application/pdf').isImage, isFalse);
+      expect(
+        _attachment(id: 1, contentType: 'application/pdf').isImage,
+        isFalse,
+      );
       expect(_attachment(id: 1).isImage, isFalse);
     });
 
@@ -717,17 +744,16 @@ TicketAttachment _attachment({
   String filePath = '/path/to/test.pdf',
   String? contentType,
   int? fileSizeBytes,
-}) =>
-    TicketAttachment(
-      id: id,
-      ticketId: ticketId,
-      uploadedByUserId: uploadedByUserId,
-      fileName: fileName,
-      filePath: filePath,
-      contentType: contentType,
-      fileSizeBytes: fileSizeBytes,
-      createdAt: DateTime.now(),
-    );
+}) => TicketAttachment(
+  id: id,
+  ticketId: ticketId,
+  uploadedByUserId: uploadedByUserId,
+  fileName: fileName,
+  filePath: filePath,
+  contentType: contentType,
+  fileSizeBytes: fileSizeBytes,
+  createdAt: DateTime.now(),
+);
 
 TicketAttachmentDto _dto({
   int? id,
@@ -737,17 +763,16 @@ TicketAttachmentDto _dto({
   String filePath = '/path/to/test.pdf',
   String? contentType,
   int? fileSizeBytes,
-}) =>
-    TicketAttachmentDto(
-      id: id,
-      ticketId: ticketId,
-      uploadedByUserId: uploadedByUserId,
-      fileName: fileName,
-      filePath: filePath,
-      contentType: contentType,
-      fileSizeBytes: fileSizeBytes,
-      createdAt: DateTime.now(),
-    );
+}) => TicketAttachmentDto(
+  id: id,
+  ticketId: ticketId,
+  uploadedByUserId: uploadedByUserId,
+  fileName: fileName,
+  filePath: filePath,
+  contentType: contentType,
+  fileSizeBytes: fileSizeBytes,
+  createdAt: DateTime.now(),
+);
 
 // =========================================================================
 // MOCK SERVICE
@@ -959,7 +984,9 @@ class MockAttachmentDataSource implements IAttachmentLocalDataSource {
     _insertCallback = null;
   }
 
-  void stubInsertAttachmentCallback(int Function(TicketAttachmentDto) callback) {
+  void stubInsertAttachmentCallback(
+    int Function(TicketAttachmentDto) callback,
+  ) {
     _insertCallback = callback;
     _insertError = null;
   }
@@ -981,7 +1008,9 @@ class MockAttachmentDataSource implements IAttachmentLocalDataSource {
   int? get deletedId => _deletedId;
 
   @override
-  Future<List<TicketAttachmentDto>> getAttachmentsByTicketId(int ticketId) async {
+  Future<List<TicketAttachmentDto>> getAttachmentsByTicketId(
+    int ticketId,
+  ) async {
     return List.from(_dtos);
   }
 

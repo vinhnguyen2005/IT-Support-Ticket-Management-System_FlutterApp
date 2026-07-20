@@ -4,78 +4,64 @@ class Feedback {
   const Feedback({
     this.id,
     required this.ticketId,
-    required this.userId,
-    required this.rating,
+    required this.reviewerUserId,
+    required this.revieweeUserId,
+    required this.staffRating,
+    required this.supportRating,
     this.comment,
     required this.createdAt,
     this.updatedAt,
     this.ticketTitle,
-    this.userName,
+    this.reviewerName,
+    this.revieweeName,
   });
 
   final int? id;
   final int ticketId;
-  final int userId;
-  final int rating;
+  final int reviewerUserId;
+  final int revieweeUserId;
+  final int staffRating;
+  final int supportRating;
   final String? comment;
   final DateTime createdAt;
   final DateTime? updatedAt;
   final String? ticketTitle;
-  final String? userName;
+  final String? reviewerName;
+  final String? revieweeName;
 
-  bool get isValidRating => rating >= 1 && rating <= 5;
+  bool get hasValidRatings =>
+      staffRating >= 1 &&
+      staffRating <= 5 &&
+      supportRating >= 1 &&
+      supportRating <= 5;
 
   Feedback copyWith({
     int? id,
     int? ticketId,
-    int? userId,
-    int? rating,
+    int? reviewerUserId,
+    int? revieweeUserId,
+    int? staffRating,
+    int? supportRating,
     Object? comment = _unsetFeedbackField,
     DateTime? createdAt,
     DateTime? updatedAt,
     String? ticketTitle,
-    String? userName,
-  }) {
-    return Feedback(
-      id: id ?? this.id,
-      ticketId: ticketId ?? this.ticketId,
-      userId: userId ?? this.userId,
-      rating: rating ?? this.rating,
-      comment: identical(comment, _unsetFeedbackField)
-          ? this.comment
-          : comment as String?,
-      createdAt: createdAt ?? this.createdAt,
-      updatedAt: updatedAt ?? this.updatedAt,
-      ticketTitle: ticketTitle ?? this.ticketTitle,
-      userName: userName ?? this.userName,
-    );
-  }
-
-  @override
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        other is Feedback &&
-            other.id == id &&
-            other.ticketId == ticketId &&
-            other.userId == userId &&
-            other.rating == rating &&
-            other.comment == comment &&
-            other.createdAt == createdAt &&
-            other.updatedAt == updatedAt &&
-            other.ticketTitle == ticketTitle &&
-            other.userName == userName;
-  }
-
-  @override
-  int get hashCode => Object.hash(
-    id,
-    ticketId,
-    userId,
-    rating,
-    comment,
-    createdAt,
-    updatedAt,
-    ticketTitle,
-    userName,
+    String? reviewerName,
+    String? revieweeName,
+  }) => Feedback(
+    id: id ?? this.id,
+    ticketId: ticketId ?? this.ticketId,
+    reviewerUserId: reviewerUserId ?? this.reviewerUserId,
+    revieweeUserId: revieweeUserId ?? this.revieweeUserId,
+    staffRating: staffRating ?? this.staffRating,
+    supportRating: supportRating ?? this.supportRating,
+    comment: identical(comment, _unsetFeedbackField)
+        ? this.comment
+        : comment as String?,
+    createdAt: createdAt ?? this.createdAt,
+    updatedAt: updatedAt ?? this.updatedAt,
+    ticketTitle: ticketTitle ?? this.ticketTitle,
+    reviewerName: reviewerName ?? this.reviewerName,
+    revieweeName: revieweeName ?? this.revieweeName,
   );
 }

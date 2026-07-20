@@ -306,13 +306,13 @@ class ReportLocalDataSourceImpl implements IReportLocalDataSource {
       '''
       SELECT
         COUNT(f.id) AS total_feedback,
-        AVG(f.rating) AS average_rating,
-        SUM(CASE WHEN f.rating <= 2 THEN 1 ELSE 0 END) AS low_rating_count,
-        SUM(CASE WHEN f.rating = 1 THEN 1 ELSE 0 END) AS rating_1_count,
-        SUM(CASE WHEN f.rating = 2 THEN 1 ELSE 0 END) AS rating_2_count,
-        SUM(CASE WHEN f.rating = 3 THEN 1 ELSE 0 END) AS rating_3_count,
-        SUM(CASE WHEN f.rating = 4 THEN 1 ELSE 0 END) AS rating_4_count,
-        SUM(CASE WHEN f.rating = 5 THEN 1 ELSE 0 END) AS rating_5_count
+        AVG(f.supportRating) AS average_rating,
+        SUM(CASE WHEN f.supportRating <= 2 THEN 1 ELSE 0 END) AS low_rating_count,
+        SUM(CASE WHEN f.supportRating = 1 THEN 1 ELSE 0 END) AS rating_1_count,
+        SUM(CASE WHEN f.supportRating = 2 THEN 1 ELSE 0 END) AS rating_2_count,
+        SUM(CASE WHEN f.supportRating = 3 THEN 1 ELSE 0 END) AS rating_3_count,
+        SUM(CASE WHEN f.supportRating = 4 THEN 1 ELSE 0 END) AS rating_4_count,
+        SUM(CASE WHEN f.supportRating = 5 THEN 1 ELSE 0 END) AS rating_5_count
       FROM ${AppDatabase.feedbackTable} f
       JOIN ${AppDatabase.ticketsTable} t ON t.id = f.ticketId
       WHERE t.closedAt IS NOT NULL
@@ -341,17 +341,17 @@ class ReportLocalDataSourceImpl implements IReportLocalDataSource {
         f.ticketId AS ticket_id,
         t.title AS ticket_title,
         u.fullName AS user_name,
-        f.rating,
+        f.supportRating AS rating,
         f.comment,
         f.createdAt AS created_at
       FROM ${AppDatabase.feedbackTable} f
       JOIN ${AppDatabase.ticketsTable} t ON t.id = f.ticketId
-      JOIN ${AppDatabase.usersTable} u ON u.id = f.userId
-      WHERE f.rating <= 2
+      JOIN ${AppDatabase.usersTable} u ON u.id = f.reviewerUserId
+      WHERE f.supportRating <= 2
         AND t.closedAt IS NOT NULL
         AND DATE(t.closedAt) BETWEEN ? AND ?
       ${ticketFilter.sql}
-      ORDER BY f.rating ASC, datetime(f.createdAt) DESC
+      ORDER BY f.supportRating ASC, datetime(f.createdAt) DESC
       ''',
       [startDate, endDate, ...ticketFilter.args],
     );

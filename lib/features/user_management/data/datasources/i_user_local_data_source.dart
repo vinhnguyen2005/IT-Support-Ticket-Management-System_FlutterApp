@@ -11,10 +11,7 @@ abstract interface class IUserLocalDataSource {
 
   Future<int> updateUser(UpdateUserRequestDto request);
 
-  Future<int> setUserActive({
-    required int id,
-    required bool isActive,
-  });
+  Future<int> setUserActive({required int id, required bool isActive});
 
   Future<int> resetTemporaryPassword({
     required int id,

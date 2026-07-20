@@ -316,22 +316,15 @@ void main() {
 
     test('rejects empty content', () async {
       await expectLater(
-        () => service.addComment(
-          ticketId: 1,
-          authorId: 2,
-          content: '',
-        ),
+        () => service.addComment(ticketId: 1, authorId: 2, content: ''),
         throwsA(isA<ArgumentError>()),
       );
     });
 
     test('rejects whitespace-only content', () async {
       await expectLater(
-        () => service.addComment(
-          ticketId: 1,
-          authorId: 2,
-          content: '   \n\t  ',
-        ),
+        () =>
+            service.addComment(ticketId: 1, authorId: 2, content: '   \n\t  '),
         throwsA(isA<ArgumentError>()),
       );
     });
@@ -370,11 +363,7 @@ void main() {
       mockRepository.stubAddCommentThrow(Exception('Database error'));
 
       await expectLater(
-        () => service.addComment(
-          ticketId: 1,
-          authorId: 2,
-          content: 'Valid',
-        ),
+        () => service.addComment(ticketId: 1, authorId: 2, content: 'Valid'),
         throwsA(isA<Exception>()),
       );
     });
@@ -391,15 +380,14 @@ TicketComment _comment({
   int ticketId = 1,
   int authorId = 1,
   DateTime? updatedAt,
-}) =>
-    TicketComment(
-      id: id,
-      ticketId: ticketId,
-      authorId: authorId,
-      content: content,
-      createdAt: DateTime.now(),
-      updatedAt: updatedAt,
-    );
+}) => TicketComment(
+  id: id,
+  ticketId: ticketId,
+  authorId: authorId,
+  content: content,
+  createdAt: DateTime.now(),
+  updatedAt: updatedAt,
+);
 
 // =========================================================================
 // MOCK SERVICE

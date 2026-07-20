@@ -13,21 +13,24 @@ class FeedbackViewModel extends ChangeNotifier {
   String? _errorMessage;
   Feedback? _feedback;
   List<Feedback> _userFeedbacks = [];
-  int _rating = 0;
+  int _staffRating = 0;
+  int _supportRating = 0;
   String _comment = '';
 
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   Feedback? get feedback => _feedback;
   List<Feedback> get userFeedbacks => List.unmodifiable(_userFeedbacks);
-  int get rating => _rating;
+  int get staffRating => _staffRating;
+  int get supportRating => _supportRating;
   String get comment => _comment;
 
   Future<void> loadFeedbackByTicketId(int ticketId) async {
     _isLoading = true;
     _errorMessage = null;
     _feedback = null;
-    _rating = 0;
+    _staffRating = 0;
+    _supportRating = 0;
     _comment = '';
     _safeNotifyListeners();
 
@@ -35,7 +38,8 @@ class FeedbackViewModel extends ChangeNotifier {
       _feedback = await _service.getFeedbackByTicketId(ticketId);
       final feedback = _feedback;
       if (feedback != null) {
-        _rating = feedback.rating;
+        _staffRating = feedback.staffRating;
+        _supportRating = feedback.supportRating;
         _comment = feedback.comment ?? '';
       }
     } catch (e) {
@@ -47,14 +51,16 @@ class FeedbackViewModel extends ChangeNotifier {
     }
   }
 
-  Future<void> loadFeedbackByUserId(int userId) async {
+  Future<void> loadFeedbackByReviewerUserId(int reviewerUserId) async {
     _isLoading = true;
     _errorMessage = null;
     _userFeedbacks = [];
     _safeNotifyListeners();
 
     try {
-      _userFeedbacks = await _service.getFeedbackByUserId(userId);
+      _userFeedbacks = await _service.getFeedbackByReviewerUserId(
+        reviewerUserId,
+      );
     } catch (e) {
       _userFeedbacks = [];
       _errorMessage = 'Failed to load feedback: $e';
@@ -66,8 +72,10 @@ class FeedbackViewModel extends ChangeNotifier {
 
   Future<bool> submitFeedback({
     required int ticketId,
-    required int userId,
-    required int rating,
+    required int reviewerUserId,
+    required int revieweeUserId,
+    required int staffRating,
+    required int supportRating,
     String? comment,
   }) async {
     _isLoading = true;
@@ -77,11 +85,14 @@ class FeedbackViewModel extends ChangeNotifier {
     try {
       _feedback = await _service.submitFeedback(
         ticketId: ticketId,
-        userId: userId,
-        rating: rating,
+        reviewerUserId: reviewerUserId,
+        revieweeUserId: revieweeUserId,
+        staffRating: staffRating,
+        supportRating: supportRating,
         comment: comment,
       );
-      _rating = _feedback?.rating ?? rating;
+      _staffRating = _feedback?.staffRating ?? staffRating;
+      _supportRating = _feedback?.supportRating ?? supportRating;
       _comment = _feedback?.comment ?? comment ?? '';
       return true;
     } catch (e) {
@@ -96,8 +107,10 @@ class FeedbackViewModel extends ChangeNotifier {
   Future<bool> updateFeedback({
     required int feedbackId,
     required int ticketId,
-    required int userId,
-    required int rating,
+    required int reviewerUserId,
+    required int revieweeUserId,
+    required int staffRating,
+    required int supportRating,
     String? comment,
     required DateTime createdAt,
   }) async {
@@ -109,15 +122,18 @@ class FeedbackViewModel extends ChangeNotifier {
       final feedback = Feedback(
         id: feedbackId,
         ticketId: ticketId,
-        userId: userId,
-        rating: rating,
+        reviewerUserId: reviewerUserId,
+        revieweeUserId: revieweeUserId,
+        staffRating: staffRating,
+        supportRating: supportRating,
         comment: comment,
         createdAt: createdAt,
         updatedAt: DateTime.now(),
       );
       await _service.updateFeedback(feedback);
       _feedback = feedback;
-      _rating = rating;
+      _staffRating = staffRating;
+      _supportRating = supportRating;
       _comment = comment ?? '';
       return true;
     } catch (e) {
@@ -137,7 +153,8 @@ class FeedbackViewModel extends ChangeNotifier {
     try {
       await _service.deleteFeedback(id);
       _feedback = null;
-      _rating = 0;
+      _staffRating = 0;
+      _supportRating = 0;
       _comment = '';
       return true;
     } catch (e) {
@@ -149,8 +166,13 @@ class FeedbackViewModel extends ChangeNotifier {
     }
   }
 
-  void updateRating(int value) {
-    _rating = value;
+  void updateStaffRating(int value) {
+    _staffRating = value;
+    _safeNotifyListeners();
+  }
+
+  void updateSupportRating(int value) {
+    _supportRating = value;
     _safeNotifyListeners();
   }
 
@@ -160,7 +182,8 @@ class FeedbackViewModel extends ChangeNotifier {
   }
 
   void resetForm() {
-    _rating = 0;
+    _staffRating = 0;
+    _supportRating = 0;
     _comment = '';
     _safeNotifyListeners();
   }

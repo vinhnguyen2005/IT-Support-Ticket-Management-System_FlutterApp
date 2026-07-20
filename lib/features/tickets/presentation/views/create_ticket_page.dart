@@ -64,9 +64,45 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
     return viewModel;
   }
 
-  Future<void> _pickFile() async {
+  Future<void> _showImageSourceOptions() async {
+    final source = await showModalBottomSheet<_AttachmentImageSource>(
+      context: context,
+      builder: (bottomSheetContext) => SafeArea(
+        child: Wrap(
+          children: [
+            ListTile(
+              leading: const Icon(Icons.camera_alt),
+              title: const Text('Take Photo'),
+              onTap: () => Navigator.pop(
+                bottomSheetContext,
+                _AttachmentImageSource.camera,
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.photo_library),
+              title: const Text('Choose from Gallery'),
+              onTap: () => Navigator.pop(
+                bottomSheetContext,
+                _AttachmentImageSource.gallery,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || source == null) return;
+
+    await _pickFile(source);
+  }
+
+  Future<void> _pickFile(_AttachmentImageSource source) async {
     try {
-      final attachmentPath = await TicketAttachmentStorage.pickAndStoreImage();
+      final attachmentPath = switch (source) {
+        _AttachmentImageSource.camera =>
+          await TicketAttachmentStorage.takeAndStorePhoto(),
+        _AttachmentImageSource.gallery =>
+          await TicketAttachmentStorage.pickAndStoreImage(),
+      };
       if (attachmentPath == null) return;
       if (!mounted) {
         await TicketAttachmentStorage.deleteManagedFile(attachmentPath);
@@ -83,9 +119,12 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
       });
     } catch (error) {
       if (!mounted) return;
+      final action = source == _AttachmentImageSource.camera
+          ? 'take photo'
+          : 'select image';
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text('Could not select image: $error')));
+      ).showSnackBar(SnackBar(content: Text('Could not $action: $error')));
     }
   }
 
@@ -335,7 +374,7 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
                               filePath: _attachmentPath,
                               isEditing: true,
                               isBusy: viewModel.isLoading,
-                              onPick: _pickFile,
+                              onPick: _showImageSourceOptions,
                               onClear: _clearAttachment,
                             ),
                             if (viewModel.errorMessage != null) ...[
@@ -375,6 +414,8 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
     );
   }
 }
+
+enum _AttachmentImageSource { camera, gallery }
 
 class _FormError extends StatelessWidget {
   const _FormError({required this.message});

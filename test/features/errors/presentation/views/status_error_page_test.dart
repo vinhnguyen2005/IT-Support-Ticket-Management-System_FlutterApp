@@ -10,10 +10,7 @@ void main() {
           colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo),
           useMaterial3: true,
         ),
-        home: const ClientErrorPage(
-          statusCode: 404,
-          fallbackRoute: '/home',
-        ),
+        home: const ClientErrorPage(statusCode: 404, fallbackRoute: '/home'),
       ),
     );
 
@@ -37,10 +34,7 @@ void main() {
           colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo),
           useMaterial3: true,
         ),
-        home: const ServerErrorPage(
-          statusCode: 503,
-          fallbackRoute: '/home',
-        ),
+        home: const ServerErrorPage(statusCode: 503, fallbackRoute: '/home'),
       ),
     );
 
@@ -62,10 +56,7 @@ void main() {
           colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo),
           useMaterial3: true,
         ),
-        home: const ClientErrorPage(
-          statusCode: 401,
-          fallbackRoute: '/home',
-        ),
+        home: const ClientErrorPage(statusCode: 401, fallbackRoute: '/home'),
       ),
     );
 
@@ -109,16 +100,13 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('root error page redirects to its fallback route', (tester) async {
+  testWidgets('root error page redirects to its fallback route', (
+    tester,
+  ) async {
     await tester.pumpWidget(
       MaterialApp(
-        routes: {
-          '/home': (_) => const Scaffold(body: Text('Fallback home')),
-        },
-        home: const ClientErrorPage(
-          statusCode: 404,
-          fallbackRoute: '/home',
-        ),
+        routes: {'/home': (_) => const Scaffold(body: Text('Fallback home'))},
+        home: const ClientErrorPage(statusCode: 404, fallbackRoute: '/home'),
       ),
     );
 

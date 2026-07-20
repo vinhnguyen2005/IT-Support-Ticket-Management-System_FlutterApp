@@ -4,7 +4,7 @@ class CategoryDto {
   final int id;
   final String categoryName;
   final String description; // Đổi ở đây
-  final int isActive; 
+  final int isActive;
 
   CategoryDto({
     required this.id,
@@ -25,7 +25,7 @@ class CategoryDto {
   Map<String, dynamic> toMap() {
     return {
       'name': categoryName,
-      'description': description, 
+      'description': description,
       'isActive': isActive,
       'createdAt': DateTime.now().toIso8601String(),
     };

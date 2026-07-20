@@ -3,7 +3,7 @@ import '../dtos/feedback_dto.dart';
 abstract interface class IFeedbackLocalDataSource {
   Future<FeedbackDto?> getFeedbackByTicketId(int ticketId);
 
-  Future<List<FeedbackDto>> getFeedbackByUserId(int userId);
+  Future<List<FeedbackDto>> getFeedbackByReviewerUserId(int reviewerUserId);
 
   Future<int> insertFeedback(FeedbackDto dto);
 

@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:path/path.dart' as path;
 import 'package:sqflite/sqflite.dart';
 
@@ -16,7 +17,18 @@ class TicketAttachmentStorage {
       return null;
     }
 
-    final sourcePath = result.files.single.path;
+    return _storeImage(result.files.single.path);
+  }
+
+  static Future<String?> takeAndStorePhoto() async {
+    final image = await ImagePicker().pickImage(source: ImageSource.camera);
+    if (image == null) {
+      return null;
+    }
+    return _storeImage(image.path);
+  }
+
+  static Future<String> _storeImage(String? sourcePath) async {
     if (sourcePath == null || sourcePath.isEmpty) {
       throw const FileSystemException('Selected image path is unavailable.');
     }

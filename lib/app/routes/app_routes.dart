@@ -1,13 +1,10 @@
 import 'package:flutter/material.dart';
 
-import '../../core/di/service_locator.dart';
 import '../../features/auth/presentation/viewmodels/login_view_model.dart';
 import '../../features/auth/presentation/views/change_password_page.dart';
 import '../../features/auth/presentation/views/home_page.dart';
 import '../../features/auth/presentation/views/login_page.dart';
 import '../../features/errors/presentation/views/status_error_page.dart';
-import '../../features/feedback/presentation/viewmodels/feedback_view_model.dart';
-import '../../features/feedback/presentation/views/feedback_page.dart';
 
 class StatusErrorRouteArguments {
   const StatusErrorRouteArguments({required this.statusCode, this.message});
@@ -22,7 +19,6 @@ class AppRoutes {
   static const String login = '/login';
   static const String changePassword = '/change-password';
   static const String home = '/home';
-  static const String feedback = '/feedback';
   static const String clientError = '/error/4xx';
   static const String serverError = '/error/5xx';
 
@@ -69,25 +65,6 @@ class AppRoutes {
       case home:
         return MaterialPageRoute(
           builder: (_) => HomePage(viewModel: loginViewModel),
-        );
-      case feedback:
-        final args = settings.arguments as Map<String, dynamic>?;
-        return MaterialPageRoute(
-          builder: (_) => FutureBuilder<FeedbackViewModel>(
-            future: ServiceLocator.feedbackViewModelFactory(),
-            builder: (context, snapshot) {
-              if (!snapshot.hasData) {
-                return const Scaffold(
-                  body: Center(child: CircularProgressIndicator()),
-                );
-              }
-              return FeedbackPage(
-                ticketId: args?['ticketId'] ?? 0,
-                userId: args?['userId'] ?? 0,
-                viewModel: snapshot.data!,
-              );
-            },
-          ),
         );
       case clientError:
         final args = settings.arguments as StatusErrorRouteArguments?;

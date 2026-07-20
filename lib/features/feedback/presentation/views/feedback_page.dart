@@ -8,13 +8,15 @@ class FeedbackPage extends StatefulWidget {
   const FeedbackPage({
     super.key,
     required this.ticketId,
-    required this.userId,
+    required this.reviewerUserId,
+    required this.revieweeUserId,
     this.existingFeedback,
     required this.viewModel,
   });
 
   final int ticketId;
-  final int userId;
+  final int reviewerUserId;
+  final int revieweeUserId;
   final entities.Feedback? existingFeedback;
   final FeedbackViewModel viewModel;
 
@@ -24,7 +26,8 @@ class FeedbackPage extends StatefulWidget {
 
 class _FeedbackPageState extends State<FeedbackPage> {
   static const int _maxCommentLength = 1000;
-  late int _rating;
+  late int _staffRating;
+  late int _supportRating;
   late TextEditingController _commentController;
   bool _hasSubmitted = false;
   bool _hasSyncedLoadedFeedback = false;
@@ -32,7 +35,8 @@ class _FeedbackPageState extends State<FeedbackPage> {
   @override
   void initState() {
     super.initState();
-    _rating = widget.existingFeedback?.rating ?? 0;
+    _staffRating = widget.existingFeedback?.staffRating ?? 0;
+    _supportRating = widget.existingFeedback?.supportRating ?? 0;
     _commentController = TextEditingController(
       text: widget.existingFeedback?.comment ?? '',
     );
@@ -47,10 +51,10 @@ class _FeedbackPageState extends State<FeedbackPage> {
   }
 
   Future<void> _submit() async {
-    if (_rating == 0) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Please select a rating')));
+    if (_staffRating == 0 || _supportRating == 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select both ratings')),
+      );
       return;
     }
 
@@ -66,16 +70,20 @@ class _FeedbackPageState extends State<FeedbackPage> {
       success = await widget.viewModel.updateFeedback(
         feedbackId: existingFeedback!.id!,
         ticketId: widget.ticketId,
-        userId: widget.userId,
-        rating: _rating,
+        reviewerUserId: widget.reviewerUserId,
+        revieweeUserId: widget.revieweeUserId,
+        staffRating: _staffRating,
+        supportRating: _supportRating,
         comment: comment,
         createdAt: existingFeedback.createdAt,
       );
     } else {
       success = await widget.viewModel.submitFeedback(
         ticketId: widget.ticketId,
-        userId: widget.userId,
-        rating: _rating,
+        reviewerUserId: widget.reviewerUserId,
+        revieweeUserId: widget.revieweeUserId,
+        staffRating: _staffRating,
+        supportRating: _supportRating,
         comment: comment,
       );
     }
@@ -144,46 +152,49 @@ class _FeedbackPageState extends State<FeedbackPage> {
                         const SizedBox(height: 16),
                       ],
                       const Text(
-                        'How was your experience?',
+                        'Rate the assigned staff member',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       const SizedBox(height: 16),
-                      Center(
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: List.generate(5, (index) {
-                            final starValue = index + 1;
-                            return IconButton(
-                              icon: Icon(
-                                starValue <= _rating
-                                    ? Icons.star_rounded
-                                    : Icons.star_outline_rounded,
-                                size: 40,
-                                color: starValue <= _rating
-                                    ? Colors.amber
-                                    : Colors.grey[400],
-                              ),
-                              onPressed: isLoading
-                                  ? null
-                                  : () => setState(() => _rating = starValue),
-                            );
-                          }),
-                        ),
+                      _RatingSelector(
+                        rating: _staffRating,
+                        enabled: !isLoading,
+                        onChanged: (value) =>
+                            setState(() => _staffRating = value),
                       ),
-                      if (_rating > 0) ...[
+                      if (_staffRating > 0) ...[
                         const SizedBox(height: 8),
                         Center(
                           child: Text(
-                            _getRatingLabel(_rating),
+                            _getRatingLabel(_staffRating),
                             style: TextStyle(
                               color: Colors.grey[600],
                               fontSize: 14,
                             ),
                           ),
                         ),
+                      ],
+                      const SizedBox(height: 24),
+                      const Text(
+                        'Rate your overall ticket support experience',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      _RatingSelector(
+                        rating: _supportRating,
+                        enabled: !isLoading,
+                        onChanged: (value) =>
+                            setState(() => _supportRating = value),
+                      ),
+                      if (_supportRating > 0) ...[
+                        const SizedBox(height: 8),
+                        Center(child: Text(_getRatingLabel(_supportRating))),
                       ],
                       const SizedBox(height: 24),
                       TextField(
@@ -239,7 +250,8 @@ class _FeedbackPageState extends State<FeedbackPage> {
       return;
     }
 
-    _rating = loadedFeedback.rating;
+    _staffRating = loadedFeedback.staffRating;
+    _supportRating = loadedFeedback.supportRating;
     _commentController.text = loadedFeedback.comment ?? '';
     _hasSubmitted = true;
     _hasSyncedLoadedFeedback = true;
@@ -261,4 +273,34 @@ class _FeedbackPageState extends State<FeedbackPage> {
         return '';
     }
   }
+}
+
+class _RatingSelector extends StatelessWidget {
+  const _RatingSelector({
+    required this.rating,
+    required this.enabled,
+    required this.onChanged,
+  });
+
+  final int rating;
+  final bool enabled;
+  final ValueChanged<int> onChanged;
+
+  @override
+  Widget build(BuildContext context) => Center(
+    child: Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: List.generate(5, (index) {
+        final value = index + 1;
+        return IconButton(
+          icon: Icon(
+            value <= rating ? Icons.star_rounded : Icons.star_outline_rounded,
+            size: 40,
+            color: value <= rating ? Colors.amber : Colors.grey[400],
+          ),
+          onPressed: enabled ? () => onChanged(value) : null,
+        );
+      }),
+    ),
+  );
 }

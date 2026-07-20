@@ -25,10 +25,7 @@ abstract interface class IUserManagementRepository {
     required bool isActive,
   });
 
-  Future<void> setUserActive({
-    required int id,
-    required bool isActive,
-  });
+  Future<void> setUserActive({required int id, required bool isActive});
 
   Future<void> resetTemporaryPassword({
     required int id,

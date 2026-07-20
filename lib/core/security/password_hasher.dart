@@ -10,10 +10,7 @@ class PasswordHasher {
     return sha256.convert(bytes).toString();
   }
 
-  static bool verify({
-    required String password,
-    required String passwordHash,
-  }) {
+  static bool verify({required String password, required String passwordHash}) {
     return hash(password) == passwordHash;
   }
 }

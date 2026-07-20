@@ -8,7 +8,7 @@ class CategoryLocalDataSource {
 
   // Lấy danh sách (Lấy toàn bộ từ bảng 'categories' chữ thường)
   Future<List<CategoryDto>> getCategories() async {
-    final result = await database.query('categories'); 
+    final result = await database.query('categories');
     return result.map((map) => CategoryDto.fromMap(map)).toList();
   }
 
@@ -22,9 +22,9 @@ class CategoryLocalDataSource {
     return await database.update(
       'categories',
       {
-        'name': category.categoryName,             // Khớp với cột name của nhóm
-        'description': category.description,   // Khớp với cột description
-        'isActive': category.isActive,             // Khớp với cột isActive
+        'name': category.categoryName, // Khớp với cột name của nhóm
+        'description': category.description, // Khớp với cột description
+        'isActive': category.isActive, // Khớp với cột isActive
         'updatedAt': DateTime.now().toIso8601String(), // Cập nhật thời gian sửa
       },
       where: 'id = ?', // Dùng 'id' chữ thường
@@ -36,10 +36,7 @@ class CategoryLocalDataSource {
   Future<int> softDeleteCategory(int id) async {
     return await database.update(
       'categories',
-      {
-        'isActive': 0, 
-        'updatedAt': DateTime.now().toIso8601String()
-      },
+      {'isActive': 0, 'updatedAt': DateTime.now().toIso8601String()},
       where: 'id = ?',
       whereArgs: [id],
     );
