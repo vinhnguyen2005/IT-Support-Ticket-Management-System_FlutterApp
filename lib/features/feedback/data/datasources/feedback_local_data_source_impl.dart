@@ -12,11 +12,16 @@ class FeedbackLocalDataSourceImpl implements IFeedbackLocalDataSource {
 
   @override
   Future<FeedbackDto?> getFeedbackByTicketId(int ticketId) async {
-    final rows = await _database.query(
-      AppDatabase.feedbackTable,
-      where: 'ticketId = ?',
-      whereArgs: [ticketId],
-      limit: 1,
+    final rows = await _database.rawQuery(
+      '''
+      SELECT f.*, t.title AS ticketTitle, u.fullName AS userName
+      FROM ${AppDatabase.feedbackTable} f
+      INNER JOIN ${AppDatabase.ticketsTable} t ON t.id = f.ticketId
+      INNER JOIN ${AppDatabase.usersTable} u ON u.id = f.userId
+      WHERE f.ticketId = ?
+      LIMIT 1
+      ''',
+      [ticketId],
     );
 
     if (rows.isEmpty) {
@@ -28,11 +33,16 @@ class FeedbackLocalDataSourceImpl implements IFeedbackLocalDataSource {
 
   @override
   Future<List<FeedbackDto>> getFeedbackByUserId(int userId) async {
-    final rows = await _database.query(
-      AppDatabase.feedbackTable,
-      where: 'userId = ?',
-      whereArgs: [userId],
-      orderBy: 'createdAt DESC',
+    final rows = await _database.rawQuery(
+      '''
+      SELECT f.*, t.title AS ticketTitle, u.fullName AS userName
+      FROM ${AppDatabase.feedbackTable} f
+      INNER JOIN ${AppDatabase.ticketsTable} t ON t.id = f.ticketId
+      INNER JOIN ${AppDatabase.usersTable} u ON u.id = f.userId
+      WHERE f.userId = ?
+      ORDER BY f.createdAt DESC
+      ''',
+      [userId],
     );
 
     return rows.map(FeedbackDto.fromMap).toList();
@@ -48,9 +58,16 @@ class FeedbackLocalDataSourceImpl implements IFeedbackLocalDataSource {
 
   @override
   Future<void> updateFeedback(FeedbackDto dto) async {
+    if (dto.id == null) {
+      throw const AppException('Feedback id is required.');
+    }
     final count = await _database.update(
       AppDatabase.feedbackTable,
-      dto.toMap(),
+      {
+        'rating': dto.rating,
+        'comment': dto.comment,
+        'updatedAt': dto.updatedAt?.toIso8601String(),
+      },
       where: 'id = ?',
       whereArgs: [dto.id],
     );

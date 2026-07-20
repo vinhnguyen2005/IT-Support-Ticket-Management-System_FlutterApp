@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../domain/entities/feedback.dart' as entities;
+import '../../../../core/widgets/app_states.dart';
 import '../viewmodels/feedback_view_model.dart';
 
 class FeedbackPage extends StatefulWidget {
@@ -22,6 +23,7 @@ class FeedbackPage extends StatefulWidget {
 }
 
 class _FeedbackPageState extends State<FeedbackPage> {
+  static const int _maxCommentLength = 1000;
   late int _rating;
   late TextEditingController _commentController;
   bool _hasSubmitted = false;
@@ -109,78 +111,117 @@ class _FeedbackPageState extends State<FeedbackPage> {
 
         return Scaffold(
           appBar: AppBar(title: const Text('Feedback')),
-          body: SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'How was your experience?',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 16),
-                Center(
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: List.generate(5, (index) {
-                      final starValue = index + 1;
-                      return IconButton(
-                        icon: Icon(
-                          starValue <= _rating
-                              ? Icons.star_rounded
-                              : Icons.star_outline_rounded,
-                          size: 40,
-                          color: starValue <= _rating
-                              ? Colors.amber
-                              : Colors.grey[400],
-                        ),
-                        onPressed: isLoading
-                            ? null
-                            : () => setState(() => _rating = starValue),
-                      );
-                    }),
-                  ),
-                ),
-                if (_rating > 0) ...[
-                  const SizedBox(height: 8),
-                  Center(
-                    child: Text(
-                      _getRatingLabel(_rating),
-                      style: TextStyle(color: Colors.grey[600], fontSize: 14),
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 24),
-                TextField(
-                  controller: _commentController,
-                  enabled: !isLoading,
-                  maxLines: 4,
-                  decoration: const InputDecoration(
-                    labelText: 'Comment (optional)',
-                    hintText: 'Share your experience...',
-                    alignLabelWithHint: true,
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton(
-                    onPressed: isLoading ? null : _submit,
-                    child: isLoading
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : Text(
-                            _hasSubmitted
-                                ? 'Update Feedback'
-                                : 'Submit Feedback',
+          body: AppContent(
+            maxWidth: 680,
+            child: SingleChildScrollView(
+              child: Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (widget.viewModel.errorMessage != null &&
+                          !isLoading) ...[
+                        Material(
+                          color: Theme.of(context).colorScheme.errorContainer,
+                          borderRadius: BorderRadius.circular(12),
+                          child: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Row(
+                              children: [
+                                Icon(
+                                  Icons.error_outline,
+                                  color: Theme.of(context).colorScheme.error,
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(widget.viewModel.errorMessage!),
+                                ),
+                              ],
+                            ),
                           ),
+                        ),
+                        const SizedBox(height: 16),
+                      ],
+                      const Text(
+                        'How was your experience?',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Center(
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: List.generate(5, (index) {
+                            final starValue = index + 1;
+                            return IconButton(
+                              icon: Icon(
+                                starValue <= _rating
+                                    ? Icons.star_rounded
+                                    : Icons.star_outline_rounded,
+                                size: 40,
+                                color: starValue <= _rating
+                                    ? Colors.amber
+                                    : Colors.grey[400],
+                              ),
+                              onPressed: isLoading
+                                  ? null
+                                  : () => setState(() => _rating = starValue),
+                            );
+                          }),
+                        ),
+                      ),
+                      if (_rating > 0) ...[
+                        const SizedBox(height: 8),
+                        Center(
+                          child: Text(
+                            _getRatingLabel(_rating),
+                            style: TextStyle(
+                              color: Colors.grey[600],
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 24),
+                      TextField(
+                        controller: _commentController,
+                        enabled: !isLoading,
+                        maxLines: 4,
+                        maxLength: _maxCommentLength,
+                        decoration: const InputDecoration(
+                          labelText: 'Comment (optional)',
+                          hintText: 'Share your experience...',
+                          alignLabelWithHint: true,
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      SizedBox(
+                        width: double.infinity,
+                        child: FilledButton(
+                          onPressed: isLoading ? null : _submit,
+                          child: isLoading
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : Text(
+                                  _hasSubmitted
+                                      ? 'Update Feedback'
+                                      : 'Submit Feedback',
+                                ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
+              ),
             ),
           ),
         );

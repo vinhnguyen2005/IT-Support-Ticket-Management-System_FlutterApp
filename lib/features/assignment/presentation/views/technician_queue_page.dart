@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/di/service_locator.dart';
+import '../../../../core/widgets/app_badges.dart';
+import '../../../../core/widgets/app_states.dart';
 import '../../../tickets/presentation/views/ticket_detail_page.dart';
 import '../../../tickets/presentation/widgets/sla_status_badge.dart';
 import '../../domain/entities/assignment.dart';
@@ -100,17 +102,19 @@ class _TechnicianQueuePageState extends State<TechnicianQueuePage> {
 
   Widget _buildBody(BuildContext context, TechnicianQueueViewModel viewModel) {
     if (viewModel.isLoading && viewModel.assignments.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
+      return const AppListSkeleton();
     }
 
     if (viewModel.errorMessage != null && viewModel.assignments.isEmpty) {
       return ListView(
-        padding: const EdgeInsets.all(24),
+        physics: const AlwaysScrollableScrollPhysics(),
         children: [
-          Text(
-            viewModel.errorMessage!,
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Theme.of(context).colorScheme.error),
+          SizedBox(
+            height: 520,
+            child: AppErrorState(
+              message: viewModel.errorMessage!,
+              onRetry: viewModel.loadAssignments,
+            ),
           ),
         ],
       );
@@ -118,8 +122,17 @@ class _TechnicianQueuePageState extends State<TechnicianQueuePage> {
 
     if (viewModel.assignments.isEmpty) {
       return ListView(
-        padding: EdgeInsets.all(24),
-        children: [Center(child: Text('No tickets are assigned to you.'))],
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: const [
+          SizedBox(
+            height: 520,
+            child: AppEmptyState(
+              title: 'No tickets are assigned to you.',
+              message: 'Tickets assigned to you will appear in this queue.',
+              icon: Icons.assignment_turned_in_outlined,
+            ),
+          ),
+        ],
       );
     }
 
@@ -224,18 +237,12 @@ class _AssignmentTile extends StatelessWidget {
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  Chip(
-                    visualDensity: VisualDensity.compact,
-                    label: Text(assignment.priority),
-                  ),
+                  PriorityBadge(priority: assignment.priority),
                   SlaStatusBadge(
                     status: assignment.resolutionSlaStatusAt(DateTime.now()),
                     dueAt: assignment.resolutionDueAt,
                   ),
-                  Chip(
-                    visualDensity: VisualDensity.compact,
-                    label: Text(assignment.status),
-                  ),
+                  TicketStatusBadge(status: assignment.status),
                   Chip(
                     visualDensity: VisualDensity.compact,
                     label: Text(assignment.issueType),

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../core/database/reference_data_service.dart';
-
+import '../../../../core/widgets/app_states.dart';
 import '../../domain/entities/processing_time_report.dart';
 import '../../domain/entities/staff_performance_report.dart';
 import '../../domain/entities/ticket_volume_report.dart';
@@ -85,76 +85,95 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
 
   Widget _buildBody(AdminDashboardViewModel viewModel) {
     if (viewModel.isLoading && viewModel.volumeReports.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
+      return const AppListSkeleton(itemCount: 6);
     }
 
-    return RefreshIndicator(
-      onRefresh: _loadReport,
-      child: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          _ReportHero(viewModel: viewModel, dateRange: _dateRange),
-          const SizedBox(height: 16),
-          _DateFilterCard(
-            dateRange: _dateRange,
-            isLoading: viewModel.isLoading,
-            onSelectDateRange: _selectDateRange,
-            onPresetSelected: _applyPreset,
-          ),
-          if (viewModel.isLoading) ...[
-            const SizedBox(height: 8),
-            const LinearProgressIndicator(),
-          ],
-          if (viewModel.errorMessage != null) ...[
-            const SizedBox(height: 12),
-            _ErrorCard(message: viewModel.errorMessage!, onRetry: _loadReport),
-          ],
-          const SizedBox(height: 20),
-          const _SectionTitle(
-            icon: Icons.space_dashboard_outlined,
-            title: 'Ticket overview',
-            subtitle: 'Status totals for the selected period',
-          ),
-          const SizedBox(height: 12),
-          _SummaryCards(viewModel: viewModel),
-          const SizedBox(height: 24),
-          const _SectionTitle(
-            icon: Icons.timer_outlined,
-            title: 'SLA performance',
-            subtitle:
-                'Response and resolution compliance for the selected period',
-          ),
-          const SizedBox(height: 12),
-          _SlaSummaryCards(viewModel: viewModel),
-          if (viewModel.slaPolicies.isNotEmpty) ...[
+    return AppContent(
+      maxWidth: 1280,
+      padding: EdgeInsets.zero,
+      child: RefreshIndicator(
+        onRefresh: _loadReport,
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            _ReportHero(viewModel: viewModel, dateRange: _dateRange),
             const SizedBox(height: 16),
-            _SlaPolicyCard(viewModel: viewModel),
+            _DateFilterCard(
+              dateRange: _dateRange,
+              isLoading: viewModel.isLoading,
+              onSelectDateRange: _selectDateRange,
+              onPresetSelected: _applyPreset,
+            ),
+            if (viewModel.isLoading) ...[
+              const SizedBox(height: 8),
+              const LinearProgressIndicator(),
+            ],
+            if (viewModel.errorMessage != null) ...[
+              const SizedBox(height: 12),
+              _ErrorCard(
+                message: viewModel.errorMessage!,
+                onRetry: _loadReport,
+              ),
+            ],
+            const SizedBox(height: 20),
+            const _SectionTitle(
+              icon: Icons.space_dashboard_outlined,
+              title: 'Ticket overview',
+              subtitle: 'Status totals for the selected period',
+            ),
+            const SizedBox(height: 12),
+            _SummaryCards(viewModel: viewModel),
+            const SizedBox(height: 24),
+            const _SectionTitle(
+              icon: Icons.timer_outlined,
+              title: 'SLA performance',
+              subtitle:
+                  'Response and resolution compliance for the selected period',
+            ),
+            const SizedBox(height: 12),
+            _SlaSummaryCards(viewModel: viewModel),
+            if (viewModel.slaPolicies.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              _SlaPolicyCard(viewModel: viewModel),
+            ],
+            const SizedBox(height: 24),
+            const _SectionTitle(
+              icon: Icons.calendar_view_week_outlined,
+              title: 'Ticket activity by day',
+              subtitle: 'Daily ticket counts separated by status',
+            ),
+            const SizedBox(height: 12),
+            _TicketVolumeTable(reports: viewModel.volumeReports),
+            const SizedBox(height: 24),
+            const _SectionTitle(
+              icon: Icons.engineering_outlined,
+              title: 'Staff performance',
+              subtitle: 'Assigned and completed tickets by technician',
+            ),
+            const SizedBox(height: 12),
+            _StaffPerformanceTable(reports: viewModel.performanceReports),
+            const SizedBox(height: 24),
+            const _SectionTitle(
+              icon: Icons.timer_outlined,
+              title: 'Processing time by category',
+              subtitle: 'Based on resolvedAt, not the last edited time',
+            ),
+            const SizedBox(height: 12),
+            _ProcessingTimeTable(reports: viewModel.processingTimeReports),
+            const SizedBox(height: 24),
+            _SectionTitle(
+              icon: Icons.group_outlined,
+              title: 'User report',
+              subtitle:
+                  '${viewModel.userReports.length} accounts • '
+                  '${viewModel.activeUsers} active • '
+                  '${viewModel.inactiveUsers} inactive',
+            ),
+            const SizedBox(height: 12),
+            _UserReportTable(reports: viewModel.userReports),
+            const SizedBox(height: 24),
           ],
-          const SizedBox(height: 24),
-          const _SectionTitle(
-            icon: Icons.calendar_view_week_outlined,
-            title: 'Ticket activity by day',
-            subtitle: 'Daily ticket counts separated by status',
-          ),
-          const SizedBox(height: 12),
-          _TicketVolumeTable(reports: viewModel.volumeReports),
-          const SizedBox(height: 24),
-          const _SectionTitle(
-            icon: Icons.engineering_outlined,
-            title: 'Staff performance',
-            subtitle: 'Assigned and completed tickets by technician',
-          ),
-          const SizedBox(height: 12),
-          _StaffPerformanceTable(reports: viewModel.performanceReports),
-          const SizedBox(height: 24),
-          const _SectionTitle(
-            icon: Icons.timer_outlined,
-            title: 'Processing time by category',
-            subtitle: 'Based on resolvedAt, not the last edited time',
-          ),
-          const SizedBox(height: 12),
-          _ProcessingTimeTable(reports: viewModel.processingTimeReports),
-          const SizedBox(height: 24),
+          /* Replaced by the responsive report sections above.
           _SectionTitle(
             icon: Icons.group_outlined,
             title: 'User report',
@@ -167,6 +186,8 @@ class _AdminDashboardPageState extends State<AdminDashboardPage> {
           _UserReportTable(reports: viewModel.userReports),
           const SizedBox(height: 24),
         ],
+          */
+        ),
       ),
     );
   }

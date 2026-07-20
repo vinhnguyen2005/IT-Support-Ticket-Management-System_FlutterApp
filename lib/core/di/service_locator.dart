@@ -230,7 +230,10 @@ class ServiceLocator {
   }
 
   static Future<IFeedbackService> get feedbackService async {
-    return _feedbackService ??= FeedbackServiceImpl(await feedbackRepository);
+    return _feedbackService ??= FeedbackServiceImpl(
+      await feedbackRepository,
+      ticketService: await ticketService,
+    );
   }
 
   static Future<FeedbackViewModel> feedbackViewModelFactory() async {

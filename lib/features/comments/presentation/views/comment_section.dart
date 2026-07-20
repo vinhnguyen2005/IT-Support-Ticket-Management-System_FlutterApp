@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/widgets/app_states.dart';
 import '../../domain/entities/ticket_comment.dart';
 import '../viewmodels/comment_view_model.dart';
 
@@ -68,6 +69,7 @@ class _CommentSectionState extends State<CommentSection> {
       );
     }
 
+    if (!mounted) return;
     if (success) {
       _controller.clear();
       FocusScope.of(context).unfocus();
@@ -107,11 +109,17 @@ class _CommentSectionState extends State<CommentSection> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Padding(
-              padding: EdgeInsets.all(16),
-              child: Text(
-                'Comments',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              child: Row(
+                children: [
+                  Text(
+                    'Comments',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const SizedBox(width: 8),
+                  Chip(label: Text('${comments.length}')),
+                ],
               ),
             ),
             Expanded(
@@ -132,11 +140,14 @@ class _CommentSectionState extends State<CommentSection> {
                       enabled: !isLoading && !widget.isLocked,
                       maxLines: 3,
                       minLines: 1,
+                      maxLength: 1000,
                       decoration: InputDecoration(
                         hintText: _editingCommentId != null
                             ? 'Editing comment...'
                             : 'Add a comment...',
-                        border: const OutlineInputBorder(),
+                        labelText: _editingCommentId != null
+                            ? 'Edit comment'
+                            : 'Comment',
                       ),
                     ),
                   ),
@@ -148,7 +159,7 @@ class _CommentSectionState extends State<CommentSection> {
                           ? null
                           : _cancelEdit,
                     ),
-                  IconButton(
+                  IconButton.filled(
                     tooltip: 'Send comment',
                     icon: const Icon(Icons.send),
                     onPressed: isLoading || widget.isLocked ? null : _submit,
@@ -175,23 +186,21 @@ class _CommentSectionState extends State<CommentSection> {
     required bool isLoading,
   }) {
     if (isLoading && comments.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
+      return const AppListSkeleton(itemCount: 3);
     }
 
     if (comments.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Text(
-            widget.viewModel.errorMessage ?? 'No comments yet',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: widget.viewModel.errorMessage == null
-                  ? Colors.grey
-                  : Theme.of(context).colorScheme.error,
-            ),
-          ),
-        ),
+      final error = widget.viewModel.errorMessage;
+      if (error != null) {
+        return AppErrorState(
+          message: error,
+          onRetry: () => widget.viewModel.loadComments(widget.ticketId),
+        );
+      }
+      return const AppEmptyState(
+        title: 'No comments yet',
+        message: 'Start the conversation with an update or a question.',
+        icon: Icons.forum_outlined,
       );
     }
 
@@ -233,48 +242,52 @@ class _CommentTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListTile(
-      leading: CircleAvatar(
-        child: Text((comment.authorName ?? 'U')[0].toUpperCase()),
-      ),
-      title: Row(
-        children: [
-          Text(
-            comment.authorName ?? 'Unknown',
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
-          if (comment.updatedAt != null) ...[
-            const SizedBox(width: 8),
-            Icon(Icons.edit, size: 14, color: Colors.grey[600]),
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      child: ListTile(
+        contentPadding: const EdgeInsets.all(14),
+        leading: CircleAvatar(
+          child: Text((comment.authorName ?? 'U')[0].toUpperCase()),
+        ),
+        title: Row(
+          children: [
+            Text(
+              comment.authorName ?? 'Unknown',
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            if (comment.updatedAt != null) ...[
+              const SizedBox(width: 8),
+              Icon(Icons.edit, size: 14, color: Colors.grey[600]),
+            ],
           ],
-        ],
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(comment.content),
+            const SizedBox(height: 4),
+            Text(
+              _formatDate(comment.createdAt),
+              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+            ),
+          ],
+        ),
+        trailing: isOwner && !isEditing
+            ? PopupMenuButton<String>(
+                onSelected: (value) {
+                  if (value == 'edit') {
+                    onEdit();
+                  } else if (value == 'delete') {
+                    onDelete();
+                  }
+                },
+                itemBuilder: (context) => [
+                  const PopupMenuItem(value: 'edit', child: Text('Edit')),
+                  const PopupMenuItem(value: 'delete', child: Text('Delete')),
+                ],
+              )
+            : null,
       ),
-      subtitle: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(comment.content),
-          const SizedBox(height: 4),
-          Text(
-            _formatDate(comment.createdAt),
-            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-          ),
-        ],
-      ),
-      trailing: isOwner && !isEditing
-          ? PopupMenuButton<String>(
-              onSelected: (value) {
-                if (value == 'edit') {
-                  onEdit();
-                } else if (value == 'delete') {
-                  onDelete();
-                }
-              },
-              itemBuilder: (context) => [
-                const PopupMenuItem(value: 'edit', child: Text('Edit')),
-                const PopupMenuItem(value: 'delete', child: Text('Delete')),
-              ],
-            )
-          : null,
     );
   }
 

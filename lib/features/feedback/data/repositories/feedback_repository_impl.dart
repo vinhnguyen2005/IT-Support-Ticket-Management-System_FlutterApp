@@ -1,5 +1,6 @@
 import '../../domain/entities/feedback.dart';
 import '../../domain/repositories/i_feedback_repository.dart';
+import '../../../../core/errors/exceptions.dart';
 import '../datasources/i_feedback_local_data_source.dart';
 import '../dtos/feedback_dto.dart';
 import '../mappers/feedback_mapper.dart';
@@ -38,26 +39,16 @@ class FeedbackRepositoryImpl implements IFeedbackRepository {
       ticketId,
     );
     if (existingFeedback != null) {
-      final updatedDto = FeedbackDto(
-        id: existingFeedback.id,
-        ticketId: existingFeedback.ticketId,
-        userId: userId,
-        rating: rating.clamp(1, 5),
-        comment: comment,
-        createdAt: existingFeedback.createdAt,
-        updatedAt: now,
-        ticketTitle: existingFeedback.ticketTitle,
-        userName: existingFeedback.userName,
+      throw const AppException(
+        'Feedback already exists for this ticket. Please update it instead.',
       );
-      await _localDataSource.updateFeedback(updatedDto);
-      return _mapper.mapToEntity(updatedDto);
     }
 
     final id = await _localDataSource.insertFeedback(
       FeedbackDto(
         ticketId: ticketId,
         userId: userId,
-        rating: rating.clamp(1, 5),
+        rating: rating,
         comment: comment,
         createdAt: now,
       ),
@@ -67,7 +58,7 @@ class FeedbackRepositoryImpl implements IFeedbackRepository {
       id: id,
       ticketId: ticketId,
       userId: userId,
-      rating: rating.clamp(1, 5),
+      rating: rating,
       comment: comment,
       createdAt: now,
     );
@@ -79,7 +70,6 @@ class FeedbackRepositoryImpl implements IFeedbackRepository {
       _mapper
           .mapToDto(feedback)
           .copyWith(
-            rating: feedback.rating.clamp(1, 5),
             updatedAt: DateTime.now(),
           ),
     );
