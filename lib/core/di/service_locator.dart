@@ -17,6 +17,13 @@ import '../../features/comments/data/mappers/comment_mapper.dart';
 import '../../features/comments/data/repositories/comment_repository_impl.dart';
 import '../../features/comments/domain/repositories/i_comment_repository.dart';
 import '../../features/comments/presentation/viewmodels/comment_view_model.dart';
+import '../../features/departments/application/services/department_service_impl.dart';
+import '../../features/departments/application/services/i_department_service.dart';
+import '../../features/departments/data/datasources/department_local_data_source_impl.dart';
+import '../../features/departments/data/datasources/i_department_local_data_source.dart';
+import '../../features/departments/data/repositories/department_repository_impl.dart';
+import '../../features/departments/domain/repositories/i_department_repository.dart';
+import '../../features/departments/presentation/viewmodels/department_view_model.dart';
 import '../../features/feedback/application/services/feedback_service_impl.dart';
 import '../../features/feedback/application/services/i_feedback_service.dart';
 import '../../features/feedback/data/datasources/feedback_local_data_source_impl.dart';
@@ -105,6 +112,9 @@ class ServiceLocator {
   static ICategoryRepository? _categoryRepository;
   static ICategoryService? _categoryService;
   static ReferenceDataService? _referenceDataService;
+  static IDepartmentLocalDataSource? _departmentLocalDataSource;
+  static IDepartmentRepository? _departmentRepository;
+  static IDepartmentService? _departmentService;
 
   static Future<Database> get database {
     return AppDatabase.instance;
@@ -112,6 +122,29 @@ class ServiceLocator {
 
   static Future<ReferenceDataService> get referenceDataService async {
     return _referenceDataService ??= ReferenceDataService(await database);
+  }
+
+  static Future<IDepartmentLocalDataSource>
+  get departmentLocalDataSource async {
+    return _departmentLocalDataSource ??= DepartmentLocalDataSourceImpl(
+      await database,
+    );
+  }
+
+  static Future<IDepartmentRepository> get departmentRepository async {
+    return _departmentRepository ??= DepartmentRepositoryImpl(
+      localDataSource: await departmentLocalDataSource,
+    );
+  }
+
+  static Future<IDepartmentService> get departmentService async {
+    return _departmentService ??= DepartmentServiceImpl(
+      await departmentRepository,
+    );
+  }
+
+  static Future<DepartmentViewModel> get departmentViewModel async {
+    return DepartmentViewModel(await departmentService);
   }
 
   static Future<ITicketLocalDataSource> get ticketLocalDataSource async {
@@ -230,7 +263,10 @@ class ServiceLocator {
   }
 
   static Future<IFeedbackService> get feedbackService async {
-    return _feedbackService ??= FeedbackServiceImpl(await feedbackRepository);
+    return _feedbackService ??= FeedbackServiceImpl(
+      await feedbackRepository,
+      ticketService: await ticketService,
+    );
   }
 
   static Future<FeedbackViewModel> feedbackViewModelFactory() async {
@@ -306,7 +342,10 @@ class ServiceLocator {
 
   // --- Khởi tạo ViewModel (Dùng kiểu Factory trả về instance mới) ---
   static Future<AdminDashboardViewModel> get adminDashboardViewModel async {
-    return AdminDashboardViewModel(reportService: await reportService);
+    return AdminDashboardViewModel(
+      reportService: await reportService,
+      referenceDataService: await referenceDataService,
+    );
   }
 
   // --- Khởi tạo CategoryViewModel ---

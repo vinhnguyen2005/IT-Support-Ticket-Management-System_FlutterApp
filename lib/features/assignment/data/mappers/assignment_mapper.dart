@@ -24,6 +24,11 @@ class AssignmentMapper {
       ticketCreatedAt: dto.ticketCreatedAt ?? dto.createdAt,
       ticketUpdatedAt: dto.ticketUpdatedAt,
       lastProgressMessage: dto.lastProgressMessage,
+      firstRespondedAt: dto.firstRespondedAt,
+      responseDueAt: dto.responseDueAt,
+      resolutionDueAt: dto.resolutionDueAt,
+      slaCompletedAt: dto.slaCompletedAt,
+      slaExceptionReason: dto.slaExceptionReason,
     );
   }
 }

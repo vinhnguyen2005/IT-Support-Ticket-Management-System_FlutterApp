@@ -10,7 +10,7 @@ class AppDatabase {
   AppDatabase._();
 
   static const String databaseName = 'it_support.db';
-  static const int databaseVersion = 12;
+  static const int databaseVersion = 13;
 
   static const String usersTable = 'users';
   static const String authSessionTable = 'auth_session';
@@ -24,6 +24,7 @@ class AppDatabase {
   static const String ticketAttachmentsTable = 'ticket_attachments';
   static const String ticketStatusHistoriesTable = 'ticket_status_histories';
   static const String feedbackTable = 'feedback';
+  static const String slaEventsTable = 'sla_events';
 
   static Database? _database;
 
@@ -115,6 +116,9 @@ class AppDatabase {
         whereArgs: ['admin', 'admin'],
       );
     }
+    if (oldVersion < 13) {
+      await _migrateSlaV12ToV13(database);
+    }
     await _createIndexes(database);
     await seedReferenceData(databaseOverride: database);
   }
@@ -183,6 +187,7 @@ class AppDatabase {
         name TEXT NOT NULL UNIQUE,
         level INTEGER NOT NULL,
         slaHours INTEGER,
+        responseSlaHours INTEGER,
         colorHex TEXT,
         isActive INTEGER NOT NULL DEFAULT 1,
         createdAt TEXT NOT NULL,
@@ -208,6 +213,13 @@ class AppDatabase {
         resolvedAt TEXT,
         closedAt TEXT,
         reopenedAt TEXT,
+        firstRespondedAt TEXT,
+        responseDueAt TEXT,
+        resolutionDueAt TEXT,
+        slaCompletedAt TEXT,
+        slaBreachedAt TEXT,
+        slaExceptionReason TEXT,
+        slaExceptionApprovedBy INTEGER,
         createdAt TEXT NOT NULL,
         updatedAt TEXT,
         FOREIGN KEY (createdByUserId) REFERENCES $usersTable(id),
@@ -215,6 +227,7 @@ class AppDatabase {
         FOREIGN KEY (categoryId) REFERENCES $categoriesTable(id),
         FOREIGN KEY (priorityId) REFERENCES $prioritiesTable(id),
         FOREIGN KEY (departmentId) REFERENCES $departmentsTable(id)
+        ,FOREIGN KEY (slaExceptionApprovedBy) REFERENCES $usersTable(id)
       )
     ''');
 
@@ -304,6 +317,21 @@ class AppDatabase {
       )
     ''');
 
+    batch.execute('''
+      CREATE TABLE IF NOT EXISTS $slaEventsTable (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        ticketId INTEGER NOT NULL,
+        eventType TEXT NOT NULL,
+        oldDueAt TEXT,
+        newDueAt TEXT,
+        reason TEXT,
+        createdByUserId INTEGER,
+        createdAt TEXT NOT NULL,
+        FOREIGN KEY (ticketId) REFERENCES $ticketsTable(id) ON DELETE CASCADE,
+        FOREIGN KEY (createdByUserId) REFERENCES $usersTable(id)
+      )
+    ''');
+
     await batch.commit(noResult: true);
   }
 
@@ -348,6 +376,16 @@ class AppDatabase {
     batch.execute('''
       CREATE INDEX IF NOT EXISTS idx_feedback_ticket
       ON $feedbackTable(ticketId)
+    ''');
+
+    batch.execute('''
+      CREATE INDEX IF NOT EXISTS idx_tickets_resolution_due
+      ON $ticketsTable(resolutionDueAt)
+    ''');
+
+    batch.execute('''
+      CREATE INDEX IF NOT EXISTS idx_sla_events_ticket
+      ON $slaEventsTable(ticketId)
     ''');
 
     await batch.commit(noResult: true);
@@ -441,6 +479,97 @@ class AppDatabase {
     if (!existingColumns.contains('attachmentUrl')) {
       await database.execute(
         'ALTER TABLE $ticketsTable ADD COLUMN attachmentUrl TEXT',
+      );
+    }
+  }
+
+  static Future<void> _migrateSlaV12ToV13(Database database) async {
+    final priorityColumns = await _getColumnNames(database, prioritiesTable);
+    if (!priorityColumns.contains('responseSlaHours')) {
+      await database.execute(
+        'ALTER TABLE $prioritiesTable ADD COLUMN responseSlaHours INTEGER',
+      );
+    }
+
+    final ticketColumns = await _getColumnNames(database, ticketsTable);
+    final columnsToAdd = <String, String>{
+      'firstRespondedAt': 'TEXT',
+      'responseDueAt': 'TEXT',
+      'resolutionDueAt': 'TEXT',
+      'slaCompletedAt': 'TEXT',
+      'slaBreachedAt': 'TEXT',
+      'slaExceptionReason': 'TEXT',
+      'slaExceptionApprovedBy': 'INTEGER',
+    };
+    for (final entry in columnsToAdd.entries) {
+      if (!ticketColumns.contains(entry.key)) {
+        await database.execute(
+          'ALTER TABLE $ticketsTable ADD COLUMN ${entry.key} ${entry.value}',
+        );
+      }
+    }
+
+    await _applySlaPriorityDefaults(database);
+    final rows = await database.rawQuery('''
+      SELECT
+        t.id,
+        t.createdAt,
+        t.resolvedAt,
+        t.status,
+        p.slaHours,
+        p.responseSlaHours,
+        (
+          SELECT MIN(a.assignedAt)
+          FROM $ticketAssignmentsTable a
+          WHERE a.ticketId = t.id
+        ) AS firstAssignedAt
+      FROM $ticketsTable t
+      LEFT JOIN $prioritiesTable p ON p.id = t.priorityId
+    ''');
+    for (final row in rows) {
+      final createdAt = DateTime.tryParse(row['createdAt'] as String? ?? '');
+      if (createdAt == null) continue;
+      final responseHours = row['responseSlaHours'] as int?;
+      final resolutionHours = row['slaHours'] as int?;
+      final resolvedAt = row['resolvedAt'] as String?;
+      final status = (row['status'] as String? ?? '').toLowerCase();
+      await database.update(
+        ticketsTable,
+        {
+          if (responseHours != null)
+            'responseDueAt': createdAt
+                .add(Duration(hours: responseHours))
+                .toIso8601String(),
+          if (resolutionHours != null)
+            'resolutionDueAt': createdAt
+                .add(Duration(hours: resolutionHours))
+                .toIso8601String(),
+          'firstRespondedAt': row['firstAssignedAt'],
+          'slaCompletedAt': resolvedAt,
+          if (status == 'cancelled')
+            'slaExceptionReason': 'Legacy cancelled ticket',
+        },
+        where: 'id = ?',
+        whereArgs: [row['id']],
+      );
+    }
+  }
+
+  static Future<void> _applySlaPriorityDefaults(
+    DatabaseExecutor executor,
+  ) async {
+    const responseHours = <String, int>{
+      'Critical': 1,
+      'High': 4,
+      'Medium': 8,
+      'Low': 24,
+    };
+    for (final entry in responseHours.entries) {
+      await executor.update(
+        prioritiesTable,
+        {'responseSlaHours': entry.value},
+        where: 'name = ?',
+        whereArgs: [entry.key],
       );
     }
   }
@@ -553,6 +682,7 @@ class AppDatabase {
         'name': 'Low',
         'level': 1,
         'slaHours': 72,
+        'responseSlaHours': 24,
         'colorHex': '#2E7D32',
         'createdAt': now,
       }, conflictAlgorithm: ConflictAlgorithm.ignore);
@@ -561,6 +691,7 @@ class AppDatabase {
         'name': 'Medium',
         'level': 2,
         'slaHours': 48,
+        'responseSlaHours': 8,
         'colorHex': '#F9A825',
         'createdAt': now,
       }, conflictAlgorithm: ConflictAlgorithm.ignore);
@@ -569,6 +700,7 @@ class AppDatabase {
         'name': 'High',
         'level': 3,
         'slaHours': 24,
+        'responseSlaHours': 4,
         'colorHex': '#EF6C00',
         'createdAt': now,
       }, conflictAlgorithm: ConflictAlgorithm.ignore);
@@ -577,9 +709,12 @@ class AppDatabase {
         'name': 'Critical',
         'level': 4,
         'slaHours': 4,
+        'responseSlaHours': 1,
         'colorHex': '#C62828',
         'createdAt': now,
       }, conflictAlgorithm: ConflictAlgorithm.ignore);
+
+      await _applySlaPriorityDefaults(transaction);
 
       await transaction.insert(usersTable, {
         'fullName': 'System Administrator',
@@ -843,6 +978,13 @@ class AppDatabase {
     required int departmentId,
     required String createdAt,
   }) async {
+    final created = DateTime.parse(createdAt);
+    final responseDueAt = created
+        .add(Duration(hours: _defaultResponseSlaHours(priority)))
+        .toIso8601String();
+    final resolutionDueAt = created
+        .add(Duration(hours: _defaultResolutionSlaHours(priority)))
+        .toIso8601String();
     final existingId = await _findSeedRowId(
       transaction,
       ticketsTable,
@@ -858,6 +1000,8 @@ class AppDatabase {
           'categoryId': categoryId,
           'priorityId': priorityId,
           'departmentId': departmentId,
+          'responseDueAt': responseDueAt,
+          'resolutionDueAt': resolutionDueAt,
           'updatedAt': createdAt,
         },
         where: 'id = ?',
@@ -877,8 +1021,28 @@ class AppDatabase {
       'categoryId': categoryId,
       'priorityId': priorityId,
       'departmentId': departmentId,
+      'responseDueAt': responseDueAt,
+      'resolutionDueAt': resolutionDueAt,
       'createdAt': createdAt,
     });
+  }
+
+  static int _defaultResponseSlaHours(String priority) {
+    return switch (PriorityLevel.fromValue(priority)) {
+      PriorityLevel.critical => 1,
+      PriorityLevel.high => 4,
+      PriorityLevel.medium => 8,
+      PriorityLevel.low => 24,
+    };
+  }
+
+  static int _defaultResolutionSlaHours(String priority) {
+    return switch (PriorityLevel.fromValue(priority)) {
+      PriorityLevel.critical => 4,
+      PriorityLevel.high => 24,
+      PriorityLevel.medium => 48,
+      PriorityLevel.low => 72,
+    };
   }
 
   static Future<void> _insertSeedAssignmentIfAbsent(
@@ -897,6 +1061,12 @@ class AppDatabase {
       limit: 1,
     );
     if (rows.isNotEmpty) {
+      await transaction.update(
+        ticketsTable,
+        {'firstRespondedAt': createdAt},
+        where: 'id = ? AND firstRespondedAt IS NULL',
+        whereArgs: [ticketId],
+      );
       return;
     }
 
@@ -909,6 +1079,12 @@ class AppDatabase {
       'isActive': 1,
       'createdAt': createdAt,
     });
+    await transaction.update(
+      ticketsTable,
+      {'firstRespondedAt': createdAt},
+      where: 'id = ? AND firstRespondedAt IS NULL',
+      whereArgs: [ticketId],
+    );
   }
 
   static Future<void> _insertSeedProgressUpdateIfAbsent(
@@ -954,6 +1130,7 @@ class AppDatabase {
     final database = await instance;
     final batch = database.batch();
 
+    batch.execute('DROP TABLE IF EXISTS $slaEventsTable');
     batch.execute('DROP TABLE IF EXISTS $feedbackTable');
     batch.execute('DROP TABLE IF EXISTS $ticketStatusHistoriesTable');
     batch.execute('DROP TABLE IF EXISTS $ticketAttachmentsTable');

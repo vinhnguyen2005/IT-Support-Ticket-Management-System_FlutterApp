@@ -43,9 +43,52 @@ void main() {
     expect(find.text('VPN issue'), findsNothing);
     expect(find.text('1/2 tickets'), findsOneWidget);
   });
+
+  testWidgets('admin can filter tickets by SLA state', (tester) async {
+    final now = DateTime.now();
+    final viewModel = TicketAssignmentViewModel(
+      assignmentService: _AssignmentService(),
+      ticketService: _TicketService([
+        _ticket(
+          id: 10,
+          title: 'Overdue VPN',
+          createdAt: now.subtract(const Duration(hours: 2)),
+          resolutionDueAt: now.subtract(const Duration(hours: 1)),
+        ),
+        _ticket(
+          id: 11,
+          title: 'On-time printer',
+          createdAt: now,
+          resolutionDueAt: now.add(const Duration(hours: 2)),
+        ),
+      ]),
+      userManagementService: _UserManagementService(),
+      currentUserId: 1,
+      currentUserRole: 'admin',
+      mode: TicketAssignmentMode.adminAll,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(home: AdminTicketAssignmentPage(viewModel: viewModel)),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('queue-ticket-sla-filter')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Breached').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Overdue VPN'), findsOneWidget);
+    expect(find.text('On-time printer'), findsNothing);
+    expect(find.text('1/2 tickets'), findsOneWidget);
+  });
 }
 
-Ticket _ticket({required int id, required String title}) {
+Ticket _ticket({
+  required int id,
+  required String title,
+  DateTime? createdAt,
+  DateTime? resolutionDueAt,
+}) {
   return Ticket(
     id: id,
     title: title,
@@ -53,7 +96,8 @@ Ticket _ticket({required int id, required String title}) {
     status: 'Submitted',
     priority: 'High',
     issueType: 'Network',
-    createdAt: DateTime(2026),
+    createdAt: createdAt ?? DateTime(2026),
+    resolutionDueAt: resolutionDueAt,
   );
 }
 

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 
+import '../../../../core/widgets/app_states.dart';
 import '../../domain/entities/ticket_attachment.dart';
 import '../viewmodels/attachment_view_model.dart';
 
@@ -165,28 +166,20 @@ class _AttachmentListState extends State<AttachmentList> {
             final isLoading = widget.viewModel.isLoading;
 
             if (isLoading && attachments.isEmpty) {
-              return const Center(
-                child: Padding(
-                  padding: EdgeInsets.all(32),
-                  child: CircularProgressIndicator(),
-                ),
+              return const SizedBox(
+                height: 300,
+                child: AppListSkeleton(itemCount: 2),
               );
             }
 
             if (attachments.isEmpty) {
-              return const Padding(
-                padding: EdgeInsets.all(32),
-                child: Center(
-                  child: Column(
-                    children: [
-                      Icon(Icons.attach_file, size: 48, color: Colors.grey),
-                      SizedBox(height: 8),
-                      Text(
-                        'No attachments',
-                        style: TextStyle(color: Colors.grey),
-                      ),
-                    ],
-                  ),
+              return const SizedBox(
+                height: 260,
+                child: AppEmptyState(
+                  title: 'No attachments',
+                  message:
+                      'Uploaded evidence and supporting files will appear here.',
+                  icon: Icons.attach_file,
                 ),
               );
             }
@@ -230,56 +223,98 @@ class _AttachmentTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListTile(
-      leading: CircleAvatar(
-        backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-        child: Icon(
-          _getFileIcon(),
-          color: Theme.of(context).colorScheme.primary,
+    return Card(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+      child: ListTile(
+        onTap: attachment.isImage ? () => _previewImage(context) : null,
+        contentPadding: const EdgeInsets.all(12),
+        leading: CircleAvatar(
+          backgroundColor: Theme.of(context).colorScheme.primaryContainer,
+          child: Icon(
+            _getFileIcon(),
+            color: Theme.of(context).colorScheme.primary,
+          ),
+        ),
+        title: Text(
+          attachment.fileName,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(attachment.fileSizeFormatted),
+            Text(
+              _formatDate(attachment.createdAt),
+              style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+            ),
+          ],
+        ),
+        trailing: IconButton(
+          icon: const Icon(Icons.delete_outline),
+          onPressed: onDelete == null
+              ? null
+              : () async {
+                  final confirmed = await showDialog<bool>(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: const Text('Delete Attachment'),
+                      content: Text('Delete "${attachment.fileName}"?'),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context, false),
+                          child: const Text('Cancel'),
+                        ),
+                        FilledButton(
+                          onPressed: () => Navigator.pop(context, true),
+                          child: const Text('Delete'),
+                        ),
+                      ],
+                    ),
+                  );
+
+                  if (confirmed == true) {
+                    onDelete!();
+                  }
+                },
         ),
       ),
-      title: Text(
-        attachment.fileName,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
-      subtitle: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(attachment.fileSizeFormatted),
-          Text(
-            _formatDate(attachment.createdAt),
-            style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-          ),
-        ],
-      ),
-      trailing: IconButton(
-        icon: const Icon(Icons.delete_outline),
-        onPressed: onDelete == null
-            ? null
-            : () async {
-                final confirmed = await showDialog<bool>(
-                  context: context,
-                  builder: (context) => AlertDialog(
-                    title: const Text('Delete Attachment'),
-                    content: Text('Delete "${attachment.fileName}"?'),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.pop(context, false),
-                        child: const Text('Cancel'),
-                      ),
-                      FilledButton(
-                        onPressed: () => Navigator.pop(context, true),
-                        child: const Text('Delete'),
-                      ),
-                    ],
-                  ),
-                );
+    );
+  }
 
-                if (confirmed == true) {
-                  onDelete!();
-                }
-              },
+  Future<void> _previewImage(BuildContext context) async {
+    final file = File(attachment.filePath);
+    if (!await file.exists()) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('This attachment is no longer available.'),
+        ),
+      );
+      return;
+    }
+    if (!context.mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (context) => Dialog(
+        child: Stack(
+          children: [
+            InteractiveViewer(
+              minScale: 0.5,
+              maxScale: 4,
+              child: Image.file(file, fit: BoxFit.contain),
+            ),
+            Positioned(
+              top: 8,
+              right: 8,
+              child: IconButton.filledTonal(
+                tooltip: 'Close preview',
+                onPressed: () => Navigator.pop(context),
+                icon: const Icon(Icons.close),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

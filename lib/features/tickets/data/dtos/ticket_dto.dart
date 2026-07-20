@@ -27,6 +27,13 @@ class TicketDto {
     this.departmentId,
     this.closedAt,
     this.reopenedAt,
+    this.firstRespondedAt,
+    this.responseDueAt,
+    this.resolutionDueAt,
+    this.slaCompletedAt,
+    this.slaBreachedAt,
+    this.slaExceptionReason,
+    this.slaExceptionApprovedBy,
   });
 
   final int? id;
@@ -52,6 +59,13 @@ class TicketDto {
   final int? departmentId;
   final DateTime? closedAt;
   final DateTime? reopenedAt;
+  final DateTime? firstRespondedAt;
+  final DateTime? responseDueAt;
+  final DateTime? resolutionDueAt;
+  final DateTime? slaCompletedAt;
+  final DateTime? slaBreachedAt;
+  final String? slaExceptionReason;
+  final int? slaExceptionApprovedBy;
 
   factory TicketDto.fromMap(Map<String, Object?> map) {
     return TicketDto(
@@ -82,6 +96,13 @@ class TicketDto {
       departmentId: _readInt(map['departmentId']),
       closedAt: _readDateTime(map['closedAt']),
       reopenedAt: _readDateTime(map['reopenedAt']),
+      firstRespondedAt: _readDateTime(map['firstRespondedAt']),
+      responseDueAt: _readDateTime(map['responseDueAt']),
+      resolutionDueAt: _readDateTime(map['resolutionDueAt']),
+      slaCompletedAt: _readDateTime(map['slaCompletedAt']),
+      slaBreachedAt: _readDateTime(map['slaBreachedAt']),
+      slaExceptionReason: map['slaExceptionReason'] as String?,
+      slaExceptionApprovedBy: _readInt(map['slaExceptionApprovedBy']),
     );
   }
 
@@ -127,6 +148,13 @@ class TicketDto {
       'departmentId': departmentId,
       'closedAt': closedAt?.toIso8601String(),
       'reopenedAt': reopenedAt?.toIso8601String(),
+      'firstRespondedAt': firstRespondedAt?.toIso8601String(),
+      'responseDueAt': responseDueAt?.toIso8601String(),
+      'resolutionDueAt': resolutionDueAt?.toIso8601String(),
+      'slaCompletedAt': slaCompletedAt?.toIso8601String(),
+      'slaBreachedAt': slaBreachedAt?.toIso8601String(),
+      'slaExceptionReason': slaExceptionReason,
+      'slaExceptionApprovedBy': slaExceptionApprovedBy,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt?.toIso8601String(),
     };

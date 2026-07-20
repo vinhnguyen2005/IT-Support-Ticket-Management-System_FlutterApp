@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../../core/enums/priority_level.dart';
 import '../../../../core/enums/ticket_status.dart';
+import '../../../../core/enums/sla_status.dart';
 
 class TicketQueueFilterBar extends StatelessWidget {
   const TicketQueueFilterBar({
@@ -9,22 +10,26 @@ class TicketQueueFilterBar extends StatelessWidget {
     required this.searchController,
     required this.status,
     required this.priority,
+    required this.slaStatus,
     required this.resultCount,
     required this.totalCount,
     required this.onSearchChanged,
     required this.onStatusChanged,
     required this.onPriorityChanged,
+    required this.onSlaStatusChanged,
     required this.onClearFilters,
   });
 
   final TextEditingController searchController;
   final String status;
   final String priority;
+  final String slaStatus;
   final int resultCount;
   final int totalCount;
   final ValueChanged<String> onSearchChanged;
   final ValueChanged<String?> onStatusChanged;
   final ValueChanged<String?> onPriorityChanged;
+  final ValueChanged<String?> onSlaStatusChanged;
   final VoidCallback? onClearFilters;
 
   @override
@@ -83,6 +88,32 @@ class TicketQueueFilterBar extends StatelessWidget {
                   ),
                 ],
                 onChanged: onStatusChanged,
+              ),
+            ),
+            SizedBox(
+              width: 210,
+              child: DropdownButtonFormField<String>(
+                key: const Key('queue-ticket-sla-filter'),
+                isExpanded: true,
+                initialValue: slaStatus,
+                decoration: const InputDecoration(
+                  labelText: 'Resolution SLA',
+                  prefixIcon: Icon(Icons.timer_outlined),
+                  border: OutlineInputBorder(),
+                ),
+                items: [
+                  const DropdownMenuItem(
+                    value: '',
+                    child: Text('All SLA states'),
+                  ),
+                  ...SlaStatus.values.map(
+                    (item) => DropdownMenuItem(
+                      value: item.name,
+                      child: Text(item.label),
+                    ),
+                  ),
+                ],
+                onChanged: onSlaStatusChanged,
               ),
             ),
             SizedBox(

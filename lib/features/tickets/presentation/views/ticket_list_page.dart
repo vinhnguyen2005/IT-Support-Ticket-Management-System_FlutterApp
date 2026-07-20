@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../../../../core/di/service_locator.dart';
+import '../../../../core/constants/app_colors.dart';
 import '../../../../core/enums/priority_level.dart';
 import '../../../../core/enums/ticket_status.dart';
+import '../../../../core/widgets/app_badges.dart';
+import '../../../../core/widgets/app_states.dart';
 import '../../application/services/i_ticket_service.dart';
 import '../../application/services/ticket_service_impl.dart';
 import '../../data/mappers/ticket_mapper.dart';
@@ -10,6 +13,7 @@ import '../../data/repositories/ticket_repository_impl.dart';
 import '../../domain/entities/ticket.dart';
 import '../models/ticket_list_filter.dart';
 import '../viewmodels/ticket_list_view_model.dart';
+import '../widgets/sla_status_badge.dart';
 import 'create_ticket_page.dart';
 import 'ticket_detail_page.dart';
 
@@ -98,9 +102,7 @@ class _TicketListPageState extends State<TicketListPage> {
       future: _viewModelFuture,
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
+          return const Scaffold(body: AppListSkeleton());
         }
 
         final viewModel = snapshot.data!;
@@ -187,19 +189,21 @@ class _TicketListBodyState extends State<_TicketListBody> {
     final viewModel = widget.viewModel;
 
     if (viewModel.isLoading && viewModel.tickets.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
+      return const AppListSkeleton();
     }
 
     if (viewModel.errorMessage != null && viewModel.tickets.isEmpty) {
       return RefreshIndicator(
         onRefresh: widget.onLoad,
         child: ListView(
-          padding: const EdgeInsets.all(24),
+          physics: const AlwaysScrollableScrollPhysics(),
           children: [
-            Text(
-              viewModel.errorMessage!,
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            SizedBox(
+              height: MediaQuery.sizeOf(context).height * 0.7,
+              child: AppErrorState(
+                message: viewModel.errorMessage!,
+                onRetry: () => widget.onLoad(),
+              ),
             ),
           ],
         ),
@@ -210,8 +214,17 @@ class _TicketListBodyState extends State<_TicketListBody> {
       return RefreshIndicator(
         onRefresh: widget.onLoad,
         child: ListView(
-          padding: const EdgeInsets.all(24),
-          children: const [Center(child: Text('No tickets found.'))],
+          physics: const AlwaysScrollableScrollPhysics(),
+          children: const [
+            SizedBox(
+              height: 520,
+              child: AppEmptyState(
+                title: 'No tickets found.',
+                message: 'New support requests will appear here.',
+                icon: Icons.confirmation_number_outlined,
+              ),
+            ),
+          ],
         ),
       );
     }
@@ -282,16 +295,12 @@ class _TicketListBodyState extends State<_TicketListBody> {
         ),
       );
     } else {
-      for (var i = 0; i < visibleTickets.length; i++) {
-        final ticket = visibleTickets[i];
-        if (i > 0) {
-          children.add(const SizedBox(height: 8));
-        }
-
-        children.add(
-          _TicketTile(ticket: ticket, onTap: () => widget.onOpenTicket(ticket)),
-        );
-      }
+      children.add(
+        _ResponsiveTicketCollection(
+          tickets: visibleTickets,
+          onOpenTicket: widget.onOpenTicket,
+        ),
+      );
     }
 
     if (showPagination) {
@@ -341,10 +350,19 @@ class _TicketListBodyState extends State<_TicketListBody> {
         _TicketSortOption.status => TicketStatus.fromValue(
           a.status,
         ).index.compareTo(TicketStatus.fromValue(b.status).index),
+        _TicketSortOption.slaDeadline => _compareDeadline(a, b),
       };
     });
 
     return sortedTickets;
+  }
+
+  int _compareDeadline(Ticket a, Ticket b) {
+    final aDue = a.resolutionDueAt;
+    final bDue = b.resolutionDueAt;
+    if (aDue == null) return bDue == null ? 0 : 1;
+    if (bDue == null) return -1;
+    return aDue.compareTo(bDue);
   }
 
   int _priorityRank(String priority) {
@@ -411,7 +429,8 @@ enum _TicketSortOption {
   newestFirst('Newest first'),
   oldestFirst('Oldest first'),
   priorityHighFirst('Priority: high first'),
-  status('Status');
+  status('Status'),
+  slaDeadline('SLA deadline');
 
   const _TicketSortOption(this.label);
 
@@ -647,9 +666,7 @@ class _TicketTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final statusStyle = _TicketStatusStyle.fromStatus(
-      TicketStatus.fromValue(ticket.status),
-    );
+    final statusColor = AppColors.ticketStatus(ticket.status);
 
     return Card(
       margin: EdgeInsets.zero,
@@ -660,7 +677,7 @@ class _TicketTile extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Container(width: 6, color: statusStyle.color),
+              Container(width: 5, color: statusColor),
               Expanded(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(20, 14, 12, 14),
@@ -693,13 +710,13 @@ class _TicketTile extends StatelessWidget {
                         spacing: 8,
                         runSpacing: 8,
                         children: [
-                          _StatusChip(
-                            label: ticket.status,
-                            icon: statusStyle.icon,
-                            color: statusStyle.color,
-                          ),
-                          _TicketInfoChip(label: ticket.priority),
+                          TicketStatusBadge(status: ticket.status),
+                          PriorityBadge(priority: ticket.priority),
                           _TicketInfoChip(label: ticket.issueType),
+                          SlaStatusBadge(
+                            status: ticket.resolutionSlaStatus,
+                            dueAt: ticket.resolutionDueAt,
+                          ),
                         ],
                       ),
                       const SizedBox(height: 10),
@@ -745,82 +762,54 @@ class _TicketInfoChip extends StatelessWidget {
   }
 }
 
-class _StatusChip extends StatelessWidget {
-  const _StatusChip({
-    required this.label,
-    required this.icon,
-    required this.color,
+class _ResponsiveTicketCollection extends StatelessWidget {
+  const _ResponsiveTicketCollection({
+    required this.tickets,
+    required this.onOpenTicket,
   });
 
-  final String label;
-  final IconData icon;
-  final Color color;
+  final List<Ticket> tickets;
+  final ValueChanged<Ticket> onOpenTicket;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      constraints: const BoxConstraints(minHeight: 32),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        border: Border.all(color: color.withValues(alpha: 0.55)),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 16, color: color),
-          const SizedBox(width: 6),
-          Flexible(
-            child: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                color: color,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columns = constraints.maxWidth >= 1100
+            ? 3
+            : constraints.maxWidth >= 700
+            ? 2
+            : 1;
+        if (columns == 1) {
+          return Column(
+            children: [
+              for (var index = 0; index < tickets.length; index++) ...[
+                if (index > 0) const SizedBox(height: 12),
+                _TicketTile(
+                  ticket: tickets[index],
+                  onTap: () => onOpenTicket(tickets[index]),
+                ),
+              ],
+            ],
+          );
+        }
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: columns,
+            crossAxisSpacing: 16,
+            mainAxisSpacing: 16,
+            mainAxisExtent: 276,
           ),
-        ],
-      ),
+          itemCount: tickets.length,
+          itemBuilder: (context, index) => _TicketTile(
+            ticket: tickets[index],
+            onTap: () => onOpenTicket(tickets[index]),
+          ),
+        );
+      },
     );
-  }
-}
-
-class _TicketStatusStyle {
-  const _TicketStatusStyle({required this.color, required this.icon});
-
-  final Color color;
-  final IconData icon;
-
-  static _TicketStatusStyle fromStatus(TicketStatus status) {
-    return switch (status) {
-      TicketStatus.submitted => const _TicketStatusStyle(
-        color: Color(0xFF2563EB),
-        icon: Icons.inbox_outlined,
-      ),
-      TicketStatus.assigned => const _TicketStatusStyle(
-        color: Color(0xFF7C3AED),
-        icon: Icons.assignment_ind_outlined,
-      ),
-      TicketStatus.processing => const _TicketStatusStyle(
-        color: Color(0xFFD97706),
-        icon: Icons.sync,
-      ),
-      TicketStatus.resolved => const _TicketStatusStyle(
-        color: Color(0xFF059669),
-        icon: Icons.task_alt,
-      ),
-      TicketStatus.closed => const _TicketStatusStyle(
-        color: Color(0xFF475569),
-        icon: Icons.lock_outline,
-      ),
-      TicketStatus.cancelled => const _TicketStatusStyle(
-        color: Color(0xFFDC2626),
-        icon: Icons.cancel_outlined,
-      ),
-    };
   }
 }
 

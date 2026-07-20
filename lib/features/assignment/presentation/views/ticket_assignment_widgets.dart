@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/widgets/app_badges.dart';
+import '../../../../core/widgets/app_states.dart';
 import '../../../tickets/domain/entities/ticket.dart';
 import '../../../tickets/presentation/views/ticket_detail_page.dart';
+import '../../../tickets/presentation/widgets/sla_status_badge.dart';
 import '../../../user_management/domain/entities/managed_user.dart';
 import '../../../tickets/presentation/models/ticket_list_filter.dart';
 import '../viewmodels/ticket_assignment_view_model.dart';
@@ -29,6 +32,7 @@ class _TicketAssignmentListScaffoldState
   final TextEditingController _searchController = TextEditingController();
   String _statusFilter = '';
   String _priorityFilter = '';
+  String _slaFilter = '';
 
   @override
   void initState() {
@@ -121,17 +125,19 @@ class _TicketAssignmentListScaffoldState
 
   Widget _buildBody(BuildContext context, TicketAssignmentViewModel viewModel) {
     if (viewModel.isLoading && viewModel.tickets.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
+      return const AppListSkeleton();
     }
 
     if (viewModel.errorMessage != null && viewModel.tickets.isEmpty) {
       return ListView(
-        padding: const EdgeInsets.all(24),
+        physics: const AlwaysScrollableScrollPhysics(),
         children: [
-          Text(
-            viewModel.errorMessage!,
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Theme.of(context).colorScheme.error),
+          SizedBox(
+            height: 520,
+            child: AppErrorState(
+              message: viewModel.errorMessage!,
+              onRetry: viewModel.load,
+            ),
           ),
         ],
       );
@@ -139,33 +145,57 @@ class _TicketAssignmentListScaffoldState
 
     if (viewModel.tickets.isEmpty) {
       return ListView(
-        padding: const EdgeInsets.all(24),
-        children: [Center(child: Text(widget.emptyMessage))],
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          SizedBox(
+            height: 520,
+            child: AppEmptyState(
+              title: widget.emptyMessage,
+              message: 'Tickets will appear here when they are available.',
+              icon: Icons.assignment_outlined,
+            ),
+          ),
+        ],
       );
     }
 
-    final tickets = TicketListFilter(
+    final filteredTickets = TicketListFilter(
       query: _searchController.text,
       status: _statusFilter,
       priority: _priorityFilter,
     ).apply(viewModel.tickets);
+    final now = DateTime.now();
+    final tickets = _slaFilter.isEmpty
+        ? filteredTickets
+        : filteredTickets
+              .where(
+                (ticket) =>
+                    ticket.resolutionSlaStatusAt(now).name == _slaFilter,
+              )
+              .toList(growable: false);
 
     final children = <Widget>[
       TicketQueueFilterBar(
         searchController: _searchController,
         status: _statusFilter,
         priority: _priorityFilter,
+        slaStatus: _slaFilter,
         resultCount: tickets.length,
         totalCount: viewModel.tickets.length,
         onSearchChanged: (_) => setState(() {}),
         onStatusChanged: (value) => setState(() => _statusFilter = value ?? ''),
         onPriorityChanged: (value) =>
             setState(() => _priorityFilter = value ?? ''),
-        onClearFilters: _statusFilter.isEmpty && _priorityFilter.isEmpty
+        onSlaStatusChanged: (value) => setState(() => _slaFilter = value ?? ''),
+        onClearFilters:
+            _statusFilter.isEmpty &&
+                _priorityFilter.isEmpty &&
+                _slaFilter.isEmpty
             ? null
             : () => setState(() {
                 _statusFilter = '';
                 _priorityFilter = '';
+                _slaFilter = '';
               }),
       ),
       const SizedBox(height: 12),
@@ -181,23 +211,28 @@ class _TicketAssignmentListScaffoldState
         ),
       );
     } else {
-      for (var index = 0; index < tickets.length; index++) {
-        if (index > 0) {
-          children.add(const SizedBox(height: 12));
-        }
-        final ticket = tickets[index];
-        children.add(
-          _TicketAssignmentTile(
-            ticket: ticket,
-            canAssign: viewModel.canAssign(ticket) && !viewModel.isLoading,
-            onAssign: () => _assign(ticket),
-            onOpen: () => _openTicket(ticket),
-          ),
-        );
-      }
+      children.add(
+        _TicketAssignmentGrid(
+          tickets: tickets,
+          isLoading: viewModel.isLoading,
+          canAssign: viewModel.canAssign,
+          onAssign: _assign,
+          onOpen: _openTicket,
+        ),
+      );
     }
 
-    return ListView(padding: const EdgeInsets.all(16), children: children);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final horizontal = constraints.maxWidth > 1232
+            ? (constraints.maxWidth - 1200) / 2
+            : 16.0;
+        return ListView(
+          padding: EdgeInsets.fromLTRB(horizontal, 16, horizontal, 32),
+          children: children,
+        );
+      },
+    );
   }
 }
 
@@ -242,14 +277,8 @@ class _TicketAssignmentTile extends StatelessWidget {
                 runSpacing: 8,
                 crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
-                  Chip(
-                    visualDensity: VisualDensity.compact,
-                    label: Text(ticket.status),
-                  ),
-                  Chip(
-                    visualDensity: VisualDensity.compact,
-                    label: Text(ticket.priority),
-                  ),
+                  TicketStatusBadge(status: ticket.status),
+                  PriorityBadge(priority: ticket.priority),
                   Chip(
                     visualDensity: VisualDensity.compact,
                     label: Text(ticket.issueType),
@@ -259,6 +288,10 @@ class _TicketAssignmentTile extends StatelessWidget {
                       visualDensity: VisualDensity.compact,
                       label: Text('Staff #${ticket.assignedId}'),
                     ),
+                  SlaStatusBadge(
+                    status: ticket.resolutionSlaStatus,
+                    dueAt: ticket.resolutionDueAt,
+                  ),
                 ],
               ),
               const SizedBox(height: 12),
@@ -274,6 +307,62 @@ class _TicketAssignmentTile extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _TicketAssignmentGrid extends StatelessWidget {
+  const _TicketAssignmentGrid({
+    required this.tickets,
+    required this.isLoading,
+    required this.canAssign,
+    required this.onAssign,
+    required this.onOpen,
+  });
+
+  final List<Ticket> tickets;
+  final bool isLoading;
+  final bool Function(Ticket) canAssign;
+  final ValueChanged<Ticket> onAssign;
+  final ValueChanged<Ticket> onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columns = constraints.maxWidth >= 920 ? 2 : 1;
+        if (columns == 1) {
+          return Column(
+            children: [
+              for (var index = 0; index < tickets.length; index++) ...[
+                if (index > 0) const SizedBox(height: 12),
+                _tile(tickets[index]),
+              ],
+            ],
+          );
+        }
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            crossAxisSpacing: 16,
+            mainAxisSpacing: 16,
+            mainAxisExtent: 260,
+          ),
+          itemCount: tickets.length,
+          itemBuilder: (context, index) => _tile(tickets[index]),
+        );
+      },
+    );
+  }
+
+  Widget _tile(Ticket ticket) {
+    return _TicketAssignmentTile(
+      ticket: ticket,
+      canAssign: canAssign(ticket) && !isLoading,
+      onAssign: () => onAssign(ticket),
+      onOpen: () => onOpen(ticket),
     );
   }
 }

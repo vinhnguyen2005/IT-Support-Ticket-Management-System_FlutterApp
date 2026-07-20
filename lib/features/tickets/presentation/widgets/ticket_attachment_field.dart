@@ -21,6 +21,7 @@ class TicketAttachmentField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final selectedPath = filePath;
+    final colors = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -40,15 +41,29 @@ class TicketAttachmentField extends StatelessWidget {
         if (selectedPath == null)
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              border: Border.all(color: Theme.of(context).dividerColor),
-              borderRadius: BorderRadius.circular(12),
+              color: colors.surfaceContainerLow,
+              border: Border.all(color: colors.outlineVariant),
+              borderRadius: BorderRadius.circular(16),
             ),
-            child: const Text(
-              'No image selected',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.grey),
+            child: Column(
+              children: [
+                Icon(Icons.image_outlined, size: 36, color: colors.primary),
+                const SizedBox(height: 10),
+                Text(
+                  'No image selected',
+                  style: Theme.of(context).textTheme.titleSmall,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Upload a screenshot or photo to help explain the issue.',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: colors.onSurfaceVariant,
+                  ),
+                ),
+              ],
             ),
           )
         else

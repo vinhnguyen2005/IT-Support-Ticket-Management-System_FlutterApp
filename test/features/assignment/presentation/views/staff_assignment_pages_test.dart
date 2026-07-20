@@ -76,6 +76,38 @@ void main() {
       expect(find.text('VPN issue'), findsNothing);
       expect(find.text('1/2 tickets'), findsOneWidget);
     });
+
+    testWidgets('filters assigned tickets by resolution SLA state', (
+      tester,
+    ) async {
+      final now = DateTime.now();
+      final service = _StaffService(
+        assignments: [
+          _assignment(
+            title: 'Overdue VPN',
+            ticketCreatedAt: now.subtract(const Duration(hours: 2)),
+            resolutionDueAt: now.subtract(const Duration(hours: 1)),
+          ),
+          _assignment(
+            ticketId: 11,
+            title: 'On-time printer',
+            ticketCreatedAt: now,
+            resolutionDueAt: now.add(const Duration(hours: 2)),
+          ),
+        ],
+      );
+
+      await tester.pumpWidget(_queueApp(service));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('queue-ticket-sla-filter')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Breached').last);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Overdue VPN'), findsOneWidget);
+      expect(find.text('On-time printer'), findsNothing);
+      expect(find.text('1/2 tickets'), findsOneWidget);
+    });
   });
 
   group('UpdateProgressPage', () {
@@ -174,6 +206,8 @@ Assignment _assignment({
   String title = 'VPN issue',
   String status = 'Assigned',
   String? lastProgressMessage,
+  DateTime? ticketCreatedAt,
+  DateTime? resolutionDueAt,
 }) => Assignment(
   id: 1,
   ticketId: ticketId,
@@ -185,7 +219,8 @@ Assignment _assignment({
   issueType: 'Network',
   priority: 'High',
   status: status,
-  ticketCreatedAt: DateTime(2026),
+  ticketCreatedAt: ticketCreatedAt ?? DateTime(2026),
+  resolutionDueAt: resolutionDueAt,
   lastProgressMessage: lastProgressMessage,
 );
 

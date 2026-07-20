@@ -1,3 +1,5 @@
+const _unsetFeedbackField = Object();
+
 class Feedback {
   const Feedback({
     this.id,
@@ -28,7 +30,7 @@ class Feedback {
     int? ticketId,
     int? userId,
     int? rating,
-    String? comment,
+    Object? comment = _unsetFeedbackField,
     DateTime? createdAt,
     DateTime? updatedAt,
     String? ticketTitle,
@@ -39,7 +41,9 @@ class Feedback {
       ticketId: ticketId ?? this.ticketId,
       userId: userId ?? this.userId,
       rating: rating ?? this.rating,
-      comment: comment ?? this.comment,
+      comment: identical(comment, _unsetFeedbackField)
+          ? this.comment
+          : comment as String?,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
       ticketTitle: ticketTitle ?? this.ticketTitle,

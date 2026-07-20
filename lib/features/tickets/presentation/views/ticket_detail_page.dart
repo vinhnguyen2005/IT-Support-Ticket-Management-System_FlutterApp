@@ -9,6 +9,8 @@ import '../../../../core/enums/priority_level.dart';
 import '../../../../core/enums/ticket_status.dart';
 import '../../../../core/enums/user_role.dart';
 import '../../../../core/storage/ticket_attachment_storage.dart';
+import '../../../../core/widgets/app_badges.dart';
+import '../../../../core/widgets/app_states.dart';
 import '../../application/services/i_ticket_service.dart';
 import '../../application/services/ticket_service_impl.dart';
 import '../../data/mappers/ticket_mapper.dart';
@@ -17,6 +19,7 @@ import '../../domain/entities/ticket.dart';
 import '../../domain/entities/ticket_status_note.dart';
 import '../viewmodels/ticket_detail_view_model.dart';
 import '../widgets/ticket_attachment_field.dart';
+import '../widgets/sla_status_badge.dart';
 import '../../../comments/presentation/viewmodels/comment_view_model.dart';
 import '../../../comments/presentation/views/comment_section.dart';
 import '../../../feedback/presentation/viewmodels/feedback_view_model.dart';
@@ -184,6 +187,13 @@ class _TicketDetailPageState extends State<TicketDetailPage>
         categoryId: _categoryId,
         solutionSummary: ticket.solutionSummary,
         resolvedAt: ticket.resolvedAt,
+        firstRespondedAt: ticket.firstRespondedAt,
+        responseDueAt: ticket.responseDueAt,
+        resolutionDueAt: ticket.resolutionDueAt,
+        slaCompletedAt: ticket.slaCompletedAt,
+        slaBreachedAt: ticket.slaBreachedAt,
+        slaExceptionReason: ticket.slaExceptionReason,
+        slaExceptionApprovedBy: ticket.slaExceptionApprovedBy,
         createdAt: ticket.createdAt,
         updatedAt: ticket.updatedAt,
         createdByUserId: ticket.createdByUserId,
@@ -296,9 +306,7 @@ class _TicketDetailPageState extends State<TicketDetailPage>
       ]),
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
+          return const Scaffold(body: AppListSkeleton(itemCount: 4));
         }
 
         final viewModel = snapshot.data![0] as TicketDetailViewModel;
@@ -330,7 +338,8 @@ class _TicketDetailPageState extends State<TicketDetailPage>
                 !isResolved &&
                 !isClosed &&
                 !isCancelled;
-            final canConfirmResolved = ticket != null &&
+            final canConfirmResolved =
+                ticket != null &&
                 isRequester &&
                 viewer.role == UserRole.user &&
                 isResolved;
@@ -517,21 +526,23 @@ class _TicketDetailBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (viewModel.isLoading && ticket == null) {
-      return const Center(child: CircularProgressIndicator());
+      return const AppListSkeleton(itemCount: 4);
     }
 
     if (viewModel.errorMessage != null && ticket == null) {
-      return Center(
-        child: Text(
-          viewModel.errorMessage!,
-          style: TextStyle(color: Theme.of(context).colorScheme.error),
-        ),
+      return AppErrorState(
+        message: viewModel.errorMessage!,
+        onRetry: () => viewModel.loadTicket(ticketId),
       );
     }
 
     final currentTicket = ticket;
     if (currentTicket == null) {
-      return const Center(child: Text('Ticket not found.'));
+      return const AppEmptyState(
+        title: 'Ticket not found.',
+        message: 'This ticket may have been removed or is no longer available.',
+        icon: Icons.search_off_outlined,
+      );
     }
 
     return TabBarView(
@@ -556,29 +567,32 @@ class _TicketDetailBody extends StatelessWidget {
     );
 
     return SafeArea(
-      child: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          _StatusSummaryBanner(
-            status: ticket.status,
-            color: statusStyle.color,
-            icon: statusStyle.icon,
-          ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final horizontalPadding = constraints.maxWidth > 1132
+              ? (constraints.maxWidth - 1100) / 2
+              : 16.0;
+          return ListView(
+            padding: EdgeInsets.fromLTRB(
+              horizontalPadding,
+              16,
+              horizontalPadding,
+              32,
+            ),
             children: [
-              _StatusChip(
-                label: ticket.status,
-                icon: statusStyle.icon,
+              _StatusSummaryBanner(
+                status: ticket.status,
                 color: statusStyle.color,
+                icon: statusStyle.icon,
               ),
+              /* Upstream SLA layout merged into the responsive section below.
               Chip(label: Text(ticket.priority)),
               Chip(label: Text(ticket.issueType)),
               Chip(label: Text('Created ${_formatDate(ticket.createdAt)}')),
             ],
           ),
+          const SizedBox(height: 12),
+          _SlaSummary(ticket: ticket),
           const SizedBox(height: 16),
           TextField(
             controller: titleController,
@@ -628,13 +642,7 @@ class _TicketDetailBody extends StatelessWidget {
             items: priorityOptions.map((p) {
               return DropdownMenuItem(value: p, child: Text(p));
             }).toList(),
-            onChanged: !isEditing || viewModel.isLoading
-                ? null
-                : (value) {
-                    if (value != null) {
-                      onPriorityChanged(value);
-                    }
-                  },
+            onChanged: null,
           ),
           const SizedBox(height: 12),
           DropdownButtonFormField<int?>(
@@ -648,51 +656,199 @@ class _TicketDetailBody extends StatelessWidget {
               ..._categoryOptions.map(
                 (c) =>
                     DropdownMenuItem<int?>(value: c.id, child: Text(c.label)),
+              */
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  TicketStatusBadge(status: ticket.status),
+                  PriorityBadge(priority: ticket.priority),
+                  Chip(label: Text(ticket.issueType)),
+                  Chip(label: Text('Created ${_formatDate(ticket.createdAt)}')),
+                ],
               ),
+              const SizedBox(height: 12),
+              _SlaSummary(ticket: ticket),
+              const SizedBox(height: 16),
+              TextField(
+                controller: titleController,
+                enabled: isEditing && !viewModel.isLoading,
+                decoration: const InputDecoration(
+                  labelText: 'Title',
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: descriptionController,
+                enabled: isEditing && !viewModel.isLoading,
+                minLines: 4,
+                maxLines: 8,
+                decoration: const InputDecoration(
+                  labelText: 'Description',
+                  alignLabelWithHint: true,
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                initialValue: issueType,
+                decoration: const InputDecoration(
+                  labelText: 'Issue type',
+                  border: OutlineInputBorder(),
+                ),
+                items: _knownIssueTypes.map((type) {
+                  return DropdownMenuItem(value: type, child: Text(type));
+                }).toList(),
+                onChanged: !isEditing || viewModel.isLoading
+                    ? null
+                    : (value) {
+                        if (value != null) {
+                          onIssueTypeChanged(value);
+                        }
+                      },
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                initialValue: priority,
+                decoration: const InputDecoration(
+                  labelText: 'Priority',
+                  border: OutlineInputBorder(),
+                ),
+                items: priorityOptions.map((p) {
+                  return DropdownMenuItem(value: p, child: Text(p));
+                }).toList(),
+                onChanged: null,
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<int?>(
+                initialValue: _resolveValidCategoryId(categoryId),
+                decoration: const InputDecoration(
+                  labelText: 'Category',
+                  border: OutlineInputBorder(),
+                ),
+                items: [
+                  const DropdownMenuItem<int?>(
+                    value: null,
+                    child: Text('None'),
+                  ),
+                  ..._categoryOptions.map(
+                    (c) => DropdownMenuItem<int?>(
+                      value: c.id,
+                      child: Text(c.label),
+                    ),
+                  ),
+                ],
+                onChanged: !isEditing || viewModel.isLoading
+                    ? null
+                    : (value) {
+                        onCategoryChanged(value);
+                      },
+              ),
+              const SizedBox(height: 12),
+              TicketAttachmentField(
+                filePath: attachmentPath,
+                isEditing: isEditing,
+                isBusy: viewModel.isLoading,
+                onPick: onBrowseFile,
+                onClear: onClearAttachment,
+              ),
+              if (viewModel.errorMessage != null) ...[
+                const SizedBox(height: 12),
+                Text(
+                  viewModel.errorMessage!,
+                  style: TextStyle(color: Colors.red),
+                ),
+              ],
+              const SizedBox(height: 24),
+              _StatusNotesSection(
+                status: ticket.status,
+                statusStyle: statusStyle,
+                statusNotes: statusNotes,
+              ),
+              if (canViewFeedback && feedback != null) ...[
+                const SizedBox(height: 24),
+                _FeedbackSummary(feedback: feedback!),
+              ],
+              if (isEditing) ...[
+                const SizedBox(height: 20),
+                FilledButton.icon(
+                  onPressed: viewModel.isLoading ? null : onSave,
+                  icon: viewModel.isLoading
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.save),
+                  label: const Text('Save changes'),
+                ),
+              ],
             ],
-            onChanged: !isEditing || viewModel.isLoading
-                ? null
-                : (value) {
-                    onCategoryChanged(value);
-                  },
-          ),
-          const SizedBox(height: 12),
-          TicketAttachmentField(
-            filePath: attachmentPath,
-            isEditing: isEditing,
-            isBusy: viewModel.isLoading,
-            onPick: onBrowseFile,
-            onClear: onClearAttachment,
-          ),
-          if (viewModel.errorMessage != null) ...[
-            const SizedBox(height: 12),
-            Text(viewModel.errorMessage!, style: TextStyle(color: Colors.red)),
-          ],
-          const SizedBox(height: 24),
-          _StatusNotesSection(
-            status: ticket.status,
-            statusStyle: statusStyle,
-            statusNotes: statusNotes,
-          ),
-          if (canViewFeedback && feedback != null) ...[
-            const SizedBox(height: 24),
-            _FeedbackSummary(feedback: feedback!),
-          ],
-          if (isEditing) ...[
-            const SizedBox(height: 20),
-            FilledButton.icon(
-              onPressed: viewModel.isLoading ? null : onSave,
-              icon: viewModel.isLoading
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.save),
-              label: const Text('Save changes'),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _SlaSummary extends StatelessWidget {
+  const _SlaSummary({required this.ticket});
+
+  final Ticket ticket;
+
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    return Card(
+      margin: EdgeInsets.zero,
+      color: Theme.of(context).colorScheme.surfaceContainerLow,
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Service level agreement',
+              style: Theme.of(context).textTheme.titleMedium,
             ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                SlaStatusBadge(
+                  prefix: 'Response SLA',
+                  status: ticket.responseSlaStatusAt(now),
+                  dueAt: ticket.responseDueAt,
+                  now: now,
+                ),
+                SlaStatusBadge(
+                  prefix: 'Resolution SLA',
+                  status: ticket.resolutionSlaStatusAt(now),
+                  dueAt: ticket.resolutionDueAt,
+                  now: now,
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Response deadline: ${_formatOptionalDateTime(ticket.responseDueAt)}',
+            ),
+            Text(
+              'Resolution deadline: ${_formatOptionalDateTime(ticket.resolutionDueAt)}',
+            ),
+            if (ticket.firstRespondedAt != null)
+              Text(
+                'First response: ${_formatDateTime(ticket.firstRespondedAt!)}',
+              ),
+            if (ticket.slaCompletedAt != null)
+              Text('SLA completed: ${_formatDateTime(ticket.slaCompletedAt!)}'),
+            if (ticket.slaExceptionReason != null)
+              Text('Exemption: ${ticket.slaExceptionReason}'),
           ],
-        ],
+        ),
       ),
     );
   }
@@ -1023,4 +1179,8 @@ String _formatDateTime(DateTime value) {
   return '${_formatDate(value)} '
       '${value.hour.toString().padLeft(2, '0')}:'
       '${value.minute.toString().padLeft(2, '0')}';
+}
+
+String _formatOptionalDateTime(DateTime? value) {
+  return value == null ? 'Not configured' : _formatDateTime(value);
 }

@@ -4,10 +4,7 @@ import 'home_page.dart';
 import '../viewmodels/login_view_model.dart';
 
 class ChangePasswordPage extends StatefulWidget {
-  const ChangePasswordPage({
-    super.key,
-    required this.viewModel,
-  });
+  const ChangePasswordPage({super.key, required this.viewModel});
 
   final LoginViewModel viewModel;
 
@@ -22,6 +19,8 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
 
   bool _obscureNewPassword = true;
   bool _obscureConfirmPassword = true;
+  String? _newPasswordError;
+  String? _confirmPasswordError;
 
   @override
   void dispose() {
@@ -31,9 +30,23 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
   }
 
   Future<void> _submitChangePassword() async {
+    final newPassword = _newPasswordController.text;
+    final confirmation = _confirmPasswordController.text;
+    setState(() {
+      _newPasswordError = newPassword.isEmpty
+          ? 'New password is required.'
+          : newPassword.length < 8
+          ? 'Use at least 8 characters.'
+          : null;
+      _confirmPasswordError = confirmation.isEmpty
+          ? 'Please confirm your password.'
+          : null;
+    });
+    if (_newPasswordError != null || _confirmPasswordError != null) return;
+
     final success = await widget.viewModel.changePassword(
-      newPassword: _newPasswordController.text,
-      confirmPassword: _confirmPasswordController.text,
+      newPassword: newPassword,
+      confirmPassword: confirmation,
     );
 
     if (!mounted || !success) {
@@ -42,9 +55,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
 
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(
-        builder: (_) => HomePage(viewModel: widget.viewModel),
-      ),
+      MaterialPageRoute(builder: (_) => HomePage(viewModel: widget.viewModel)),
     );
   }
 
@@ -64,11 +75,10 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(24),
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 420),
+                  constraints: const BoxConstraints(maxWidth: 480),
                   child: Card(
-                    elevation: 2,
                     child: Padding(
-                      padding: const EdgeInsets.all(24),
+                      padding: const EdgeInsets.all(32),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -78,9 +88,17 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                             style: Theme.of(context).textTheme.headlineSmall,
                           ),
                           const SizedBox(height: 8),
-                          const Text(
-                            'This account is using a temporary password.',
+                          Text(
+                            'This account is using a temporary password. Create a secure password before continuing.',
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(
+                                  color: Theme.of(
+                                    context,
+                                  ).colorScheme.onSurfaceVariant,
+                                ),
                           ),
+                          const SizedBox(height: 20),
+                          const _PasswordGuidance(),
                           const SizedBox(height: 24),
                           TextField(
                             controller: _newPasswordController,
@@ -88,15 +106,15 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                             obscureText: _obscureNewPassword,
                             decoration: InputDecoration(
                               labelText: 'New password',
-                              border: const OutlineInputBorder(),
+                              prefixIcon: const Icon(Icons.password_outlined),
+                              errorText: _newPasswordError,
                               suffixIcon: IconButton(
                                 tooltip: _obscureNewPassword
                                     ? 'Show password'
                                     : 'Hide password',
                                 onPressed: () {
                                   setState(() {
-                                    _obscureNewPassword =
-                                        !_obscureNewPassword;
+                                    _obscureNewPassword = !_obscureNewPassword;
                                   });
                                 },
                                 icon: Icon(
@@ -106,6 +124,11 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                                 ),
                               ),
                             ),
+                            onChanged: (_) {
+                              if (_newPasswordError != null) {
+                                setState(() => _newPasswordError = null);
+                              }
+                            },
                           ),
                           const SizedBox(height: 16),
                           TextField(
@@ -114,7 +137,10 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                             obscureText: _obscureConfirmPassword,
                             decoration: InputDecoration(
                               labelText: 'Confirm password',
-                              border: const OutlineInputBorder(),
+                              prefixIcon: const Icon(
+                                Icons.verified_user_outlined,
+                              ),
+                              errorText: _confirmPasswordError,
                               suffixIcon: IconButton(
                                 tooltip: _obscureConfirmPassword
                                     ? 'Show password'
@@ -132,15 +158,15 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                                 ),
                               ),
                             ),
+                            onChanged: (_) {
+                              if (_confirmPasswordError != null) {
+                                setState(() => _confirmPasswordError = null);
+                              }
+                            },
                           ),
                           if (viewModel.errorMessage != null) ...[
                             const SizedBox(height: 16),
-                            Text(
-                              viewModel.errorMessage!,
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.error,
-                              ),
-                            ),
+                            _PasswordError(message: viewModel.errorMessage!),
                           ],
                           const SizedBox(height: 24),
                           FilledButton(
@@ -170,6 +196,53 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
           ),
         );
       },
+    );
+  }
+}
+
+class _PasswordGuidance extends StatelessWidget {
+  const _PasswordGuidance();
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: colors.primaryContainer.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: const Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.shield_outlined, size: 20),
+          SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Use at least 8 characters with uppercase, lowercase, number and symbol.',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PasswordError extends StatelessWidget {
+  const _PasswordError({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: colors.errorContainer,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Text(message, style: TextStyle(color: colors.onErrorContainer)),
     );
   }
 }

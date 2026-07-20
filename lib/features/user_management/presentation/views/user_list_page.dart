@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../../../core/di/service_locator.dart';
 import '../../../../core/enums/user_role.dart';
+import '../../../../core/widgets/app_states.dart';
 import '../../domain/entities/managed_user.dart';
 import '../viewmodels/user_list_view_model.dart';
 import 'create_user_page.dart';
@@ -182,9 +183,7 @@ class _UserListPageState extends State<UserListPage> {
       future: _viewModelFuture,
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
+          return const Scaffold(body: AppListSkeleton());
         }
 
         final viewModel = snapshot.data!;
@@ -259,31 +258,55 @@ class _UserListBodyState extends State<_UserListBody> {
   Widget build(BuildContext context) {
     final viewModel = widget.viewModel;
     if (viewModel.isLoading && viewModel.users.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
+      return const AppListSkeleton();
     }
 
     if (viewModel.errorMessage != null && viewModel.users.isEmpty) {
-      return Center(child: Text(viewModel.errorMessage!));
+      return AppErrorState(
+        message: viewModel.errorMessage!,
+        onRetry: viewModel.loadUsers,
+      );
     }
 
     if (viewModel.users.isEmpty) {
-      return const Center(child: Text('No users found.'));
+      return const AppEmptyState(
+        title: 'No users found.',
+        message: 'Create an account to add someone to the support workspace.',
+        icon: Icons.group_off_outlined,
+      );
     }
 
-    return ListView.separated(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 96),
-      itemBuilder: (context, index) {
-        final user = viewModel.users[index];
-        return _UserTile(
-          user: user,
-          currentUserRole: widget.currentUserRole,
-          onEdit: () => widget.onEdit(user),
-          onToggleActive: () => widget.onToggleActive(user),
-          onResetPassword: () => widget.onResetPassword(user),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columns = constraints.maxWidth >= 1050
+            ? 3
+            : constraints.maxWidth >= 680
+            ? 2
+            : 1;
+        final horizontal = constraints.maxWidth > 1232
+            ? (constraints.maxWidth - 1200) / 2
+            : 16.0;
+        return GridView.builder(
+          padding: EdgeInsets.fromLTRB(horizontal, 16, horizontal, 96),
+          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: columns,
+            crossAxisSpacing: 16,
+            mainAxisSpacing: 16,
+            mainAxisExtent: 230,
+          ),
+          itemCount: viewModel.users.length,
+          itemBuilder: (context, index) {
+            final user = viewModel.users[index];
+            return _UserTile(
+              user: user,
+              currentUserRole: widget.currentUserRole,
+              onEdit: () => widget.onEdit(user),
+              onToggleActive: () => widget.onToggleActive(user),
+              onResetPassword: () => widget.onResetPassword(user),
+            );
+          },
         );
       },
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
-      itemCount: viewModel.users.length,
     );
   }
 }
@@ -308,10 +331,21 @@ class _UserTile extends StatelessWidget {
     final canManageUser = _canManageUser();
     return Card(
       child: ListTile(
+        contentPadding: const EdgeInsets.all(18),
+        minVerticalPadding: 16,
         leading: CircleAvatar(
-          child: Text(user.fullName.substring(0, 1).toUpperCase()),
+          child: Text(
+            user.fullName.isEmpty
+                ? '?'
+                : user.fullName.substring(0, 1).toUpperCase(),
+          ),
         ),
-        title: Text(user.fullName),
+        title: Text(
+          user.fullName,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
         subtitle: Text(
           '${user.username} • ${user.email}\n'
           'Role: ${user.role}'

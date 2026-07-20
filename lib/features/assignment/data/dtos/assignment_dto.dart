@@ -17,6 +17,11 @@ class AssignmentDto {
     this.ticketCreatedAt,
     this.ticketUpdatedAt,
     this.lastProgressMessage,
+    this.firstRespondedAt,
+    this.responseDueAt,
+    this.resolutionDueAt,
+    this.slaCompletedAt,
+    this.slaExceptionReason,
   });
 
   final int? id;
@@ -36,6 +41,11 @@ class AssignmentDto {
   final DateTime? ticketCreatedAt;
   final DateTime? ticketUpdatedAt;
   final String? lastProgressMessage;
+  final DateTime? firstRespondedAt;
+  final DateTime? responseDueAt;
+  final DateTime? resolutionDueAt;
+  final DateTime? slaCompletedAt;
+  final String? slaExceptionReason;
 
   factory AssignmentDto.fromMap(Map<String, Object?> map) {
     return AssignmentDto(
@@ -62,6 +72,11 @@ class AssignmentDto {
           ? null
           : DateTime.parse(map['ticketUpdatedAt'] as String),
       lastProgressMessage: map['lastProgressMessage'] as String?,
+      firstRespondedAt: _readDateTime(map['firstRespondedAt']),
+      responseDueAt: _readDateTime(map['responseDueAt']),
+      resolutionDueAt: _readDateTime(map['resolutionDueAt']),
+      slaCompletedAt: _readDateTime(map['slaCompletedAt']),
+      slaExceptionReason: map['slaExceptionReason'] as String?,
     );
   }
 
@@ -77,5 +92,9 @@ class AssignmentDto {
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt?.toIso8601String(),
     };
+  }
+
+  static DateTime? _readDateTime(Object? value) {
+    return value is String ? DateTime.tryParse(value) : value as DateTime?;
   }
 }

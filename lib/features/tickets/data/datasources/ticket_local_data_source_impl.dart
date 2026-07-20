@@ -1,6 +1,7 @@
 import 'package:sqflite/sqflite.dart';
 
 import '../../../../core/database/app_database.dart';
+import '../../../../core/database/sla_persistence.dart';
 import '../../../../core/enums/ticket_status.dart';
 import '../../../../core/errors/exceptions.dart';
 import '../dtos/ticket_dto.dart';
@@ -36,12 +37,25 @@ class TicketLocalDataSourceImpl implements ITicketLocalDataSource {
         'changedAt': ticket.createdAt.toIso8601String(),
       });
 
+      await transaction.insert(AppDatabase.slaEventsTable, {
+        'ticketId': id,
+        'eventType': 'Started',
+        'newDueAt':
+            ticket.resolutionDueAt?.toIso8601String() ??
+            ticket.createdAt
+                .add(Duration(hours: priorityReference.resolutionHours))
+                .toIso8601String(),
+        'createdByUserId': ticket.createdByUserId ?? ticket.requestedId,
+        'createdAt': ticket.createdAt.toIso8601String(),
+      });
+
       return id;
     });
   }
 
   @override
   Future<List<TicketDto>> getTickets() async {
+    await SlaPersistence.refreshBreaches(_database);
     final rows = await _database.query(
       AppDatabase.ticketsTable,
       orderBy: 'createdAt DESC',
@@ -52,6 +66,7 @@ class TicketLocalDataSourceImpl implements ITicketLocalDataSource {
 
   @override
   Future<List<TicketDto>> getTicketsByRequester(int requesterId) async {
+    await SlaPersistence.refreshBreaches(_database);
     final rows = await _database.query(
       AppDatabase.ticketsTable,
       where: 'createdByUserId = ?',
@@ -64,6 +79,7 @@ class TicketLocalDataSourceImpl implements ITicketLocalDataSource {
 
   @override
   Future<List<TicketDto>> getTicketsByAssignee(int assigneeId) async {
+    await SlaPersistence.refreshBreaches(_database);
     final rows = await _database.query(
       AppDatabase.ticketsTable,
       where: 'assignedStaffId = ?',
@@ -76,6 +92,7 @@ class TicketLocalDataSourceImpl implements ITicketLocalDataSource {
 
   @override
   Future<TicketDto?> getTicketById(int id) async {
+    await SlaPersistence.refreshBreaches(_database);
     final rows = await _database.query(
       AppDatabase.ticketsTable,
       where: 'id = ?',
@@ -127,7 +144,7 @@ class TicketLocalDataSourceImpl implements ITicketLocalDataSource {
     await _database.transaction((transaction) async {
       final rows = await transaction.query(
         AppDatabase.ticketsTable,
-        columns: ['id', 'status'],
+        columns: ['id', 'status', 'resolutionDueAt'],
         where: 'id = ?',
         whereArgs: [statusUpdate.ticketId],
         limit: 1,
@@ -147,16 +164,30 @@ class TicketLocalDataSourceImpl implements ITicketLocalDataSource {
         );
       }
 
+      final resolutionDueAt = DateTime.tryParse(
+        rows.first['resolutionDueAt'] as String? ?? '',
+      );
+      final breached =
+          newStatus == TicketStatus.resolved &&
+          resolutionDueAt != null &&
+          statusUpdate.changedAt.isAfter(resolutionDueAt);
+
       await transaction.update(
         AppDatabase.ticketsTable,
         {
           'status': newStatus.value,
           'updatedAt': now,
           if (newStatus == TicketStatus.resolved) 'resolvedAt': now,
+          if (newStatus == TicketStatus.resolved) 'slaCompletedAt': now,
+          if (breached) 'slaBreachedAt': now,
           if (newStatus == TicketStatus.resolved)
             'solutionSummary': statusUpdate.solutionSummary,
           if (newStatus == TicketStatus.closed) 'closedAt': now,
           if (newStatus != TicketStatus.closed) 'closedAt': null,
+          if (newStatus == TicketStatus.cancelled)
+            'slaExceptionReason': statusUpdate.note,
+          if (newStatus == TicketStatus.cancelled)
+            'slaExceptionApprovedBy': statusUpdate.changedByUserId,
         },
         where: 'id = ?',
         whereArgs: [statusUpdate.ticketId],
@@ -166,6 +197,22 @@ class TicketLocalDataSourceImpl implements ITicketLocalDataSource {
         AppDatabase.ticketStatusHistoriesTable,
         statusUpdate.toMap(),
       );
+
+      if (newStatus == TicketStatus.resolved ||
+          newStatus == TicketStatus.cancelled) {
+        await transaction.insert(AppDatabase.slaEventsTable, {
+          'ticketId': statusUpdate.ticketId,
+          'eventType': newStatus == TicketStatus.cancelled
+              ? 'Exempted'
+              : breached
+              ? 'BreachedResolved'
+              : 'Completed',
+          'newDueAt': rows.first['resolutionDueAt'],
+          'reason': statusUpdate.note ?? statusUpdate.solutionSummary,
+          'createdByUserId': statusUpdate.changedByUserId,
+          'createdAt': now,
+        });
+      }
 
       if (previousStatus != statusUpdate.oldStatus) {
         await transaction.update(
@@ -224,7 +271,7 @@ class TicketLocalDataSourceImpl implements ITicketLocalDataSource {
   Future<_PriorityReference> _getPriorityReference(String priority) async {
     final rows = await _database.query(
       AppDatabase.prioritiesTable,
-      columns: ['id', 'name'],
+      columns: ['id', 'name', 'slaHours', 'responseSlaHours'],
       where: 'LOWER(name) = LOWER(?) AND isActive = 1',
       whereArgs: [priority.trim()],
       limit: 1,
@@ -247,6 +294,16 @@ class TicketLocalDataSourceImpl implements ITicketLocalDataSource {
     map['departmentId'] = ticket.departmentId ?? categoryRouting?.departmentId;
     map['priority'] = priorityReference.name;
     map['priorityId'] = priorityReference.id;
+    map['responseDueAt'] =
+        ticket.responseDueAt?.toIso8601String() ??
+        ticket.createdAt
+            .add(Duration(hours: priorityReference.responseHours))
+            .toIso8601String();
+    map['resolutionDueAt'] =
+        ticket.resolutionDueAt?.toIso8601String() ??
+        ticket.createdAt
+            .add(Duration(hours: priorityReference.resolutionHours))
+            .toIso8601String();
     return map;
   }
 
@@ -267,15 +324,24 @@ class TicketLocalDataSourceImpl implements ITicketLocalDataSource {
 }
 
 class _PriorityReference {
-  const _PriorityReference({required this.id, required this.name});
+  const _PriorityReference({
+    required this.id,
+    required this.name,
+    required this.responseHours,
+    required this.resolutionHours,
+  });
 
   final int id;
   final String name;
+  final int responseHours;
+  final int resolutionHours;
 
   factory _PriorityReference.fromMap(Map<String, Object?> map) {
     return _PriorityReference(
       id: map['id'] as int,
       name: map['name'] as String,
+      responseHours: (map['responseSlaHours'] as int?) ?? 8,
+      resolutionHours: (map['slaHours'] as int?) ?? 48,
     );
   }
 }

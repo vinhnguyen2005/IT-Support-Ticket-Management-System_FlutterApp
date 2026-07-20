@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/database/reference_data_service.dart';
 import '../../../../core/di/service_locator.dart';
 import '../../../../core/enums/user_role.dart';
+import '../../../../core/widgets/app_states.dart';
 import '../viewmodels/create_user_view_model.dart';
 
 class CreateUserPage extends StatefulWidget {
@@ -28,6 +29,7 @@ class _CreateUserPageState extends State<CreateUserPage> {
   String _role = UserRole.user.value;
   int? _departmentId;
   bool _obscureTemporaryPassword = true;
+  final GlobalKey<FormState> _formKey = GlobalKey<FormState>();
 
   @override
   void initState() {
@@ -46,6 +48,8 @@ class _CreateUserPageState extends State<CreateUserPage> {
   }
 
   Future<void> _submit(CreateUserViewModel viewModel) async {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+
     final success = await viewModel.createUser(
       fullName: _fullNameController.text,
       username: _usernameController.text,
@@ -69,9 +73,7 @@ class _CreateUserPageState extends State<CreateUserPage> {
       future: _viewModelFuture,
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
+          return const Scaffold(body: AppListSkeleton(itemCount: 4));
         }
 
         final viewModel = snapshot.data!;
@@ -81,6 +83,7 @@ class _CreateUserPageState extends State<CreateUserPage> {
             return Scaffold(
               appBar: AppBar(title: const Text('Create user')),
               body: _UserForm(
+                formKey: _formKey,
                 fullNameController: _fullNameController,
                 usernameController: _usernameController,
                 emailController: _emailController,
@@ -128,6 +131,7 @@ class _CreateUserPageState extends State<CreateUserPage> {
 
 class _UserForm extends StatelessWidget {
   const _UserForm({
+    required this.formKey,
     required this.fullNameController,
     required this.usernameController,
     required this.emailController,
@@ -147,6 +151,7 @@ class _UserForm extends StatelessWidget {
     required this.onSubmit,
   });
 
+  final GlobalKey<FormState> formKey;
   final TextEditingController fullNameController;
   final TextEditingController usernameController;
   final TextEditingController emailController;
@@ -168,132 +173,167 @@ class _UserForm extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SafeArea(
-      child: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          TextField(
-            controller: fullNameController,
-            enabled: !isLoading,
-            decoration: const InputDecoration(
-              labelText: 'Full name',
-              border: OutlineInputBorder(),
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: usernameController,
-            enabled: isCreateMode && !isLoading,
-            decoration: const InputDecoration(
-              labelText: 'Username',
-              border: OutlineInputBorder(),
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: emailController,
-            enabled: !isLoading,
-            keyboardType: TextInputType.emailAddress,
-            decoration: const InputDecoration(
-              labelText: 'Email',
-              border: OutlineInputBorder(),
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: phoneController,
-            enabled: !isLoading,
-            keyboardType: TextInputType.phone,
-            decoration: const InputDecoration(
-              labelText: 'Phone number',
-              border: OutlineInputBorder(),
-            ),
-          ),
-          const SizedBox(height: 12),
-          DropdownButtonFormField<String>(
-            value: role,
-            decoration: const InputDecoration(
-              labelText: 'Role',
-              border: OutlineInputBorder(),
-            ),
-            items: availableRoles.map((role) {
-              return DropdownMenuItem(
-                value: role.value,
-                child: Text(role.value),
-              );
-            }).toList(),
-            onChanged: isLoading
-                ? null
-                : (value) {
-                    if (value != null) {
-                      onRoleChanged(value);
-                    }
-                  },
-          ),
-          const SizedBox(height: 12),
-          DropdownButtonFormField<int>(
-            value: departmentId ?? 0,
-            decoration: const InputDecoration(
-              labelText: 'Department',
-              border: OutlineInputBorder(),
-            ),
-            items: [
-              const DropdownMenuItem(value: 0, child: Text('None')),
-              ...departments.map(
-                (department) => DropdownMenuItem(
-                  value: department.id,
-                  child: Text(department.name),
+      child: AppContent(
+        maxWidth: 800,
+        child: Form(
+          key: formKey,
+          child: ListView(
+            padding: const EdgeInsets.only(bottom: 32),
+            children: [
+              Text(
+                isCreateMode ? 'Account information' : 'User information',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Required fields are validated before the account is saved.',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                 ),
+              ),
+              const SizedBox(height: 24),
+              TextFormField(
+                controller: fullNameController,
+                enabled: !isLoading,
+                decoration: const InputDecoration(
+                  labelText: 'Full name',
+                  prefixIcon: Icon(Icons.badge_outlined),
+                ),
+                validator: (value) => value == null || value.trim().isEmpty
+                    ? 'Full name is required.'
+                    : null,
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: usernameController,
+                enabled: isCreateMode && !isLoading,
+                decoration: const InputDecoration(
+                  labelText: 'Username',
+                  prefixIcon: Icon(Icons.alternate_email),
+                ),
+                validator: (value) => value == null || value.trim().isEmpty
+                    ? 'Username is required.'
+                    : null,
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: emailController,
+                enabled: !isLoading,
+                keyboardType: TextInputType.emailAddress,
+                decoration: const InputDecoration(
+                  labelText: 'Email',
+                  prefixIcon: Icon(Icons.mail_outline),
+                ),
+                validator: (value) {
+                  final email = value?.trim() ?? '';
+                  if (email.isEmpty) return 'Email is required.';
+                  if (!email.contains('@') || !email.contains('.')) {
+                    return 'Enter a valid email address.';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: phoneController,
+                enabled: !isLoading,
+                keyboardType: TextInputType.phone,
+                decoration: const InputDecoration(
+                  labelText: 'Phone number',
+                  prefixIcon: Icon(Icons.phone_outlined),
+                ),
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                initialValue: role,
+                decoration: const InputDecoration(
+                  labelText: 'Role',
+                  prefixIcon: Icon(Icons.admin_panel_settings_outlined),
+                ),
+                items: availableRoles.map((role) {
+                  return DropdownMenuItem(
+                    value: role.value,
+                    child: Text(role.value),
+                  );
+                }).toList(),
+                onChanged: isLoading
+                    ? null
+                    : (value) {
+                        if (value != null) {
+                          onRoleChanged(value);
+                        }
+                      },
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<int>(
+                initialValue: departmentId ?? 0,
+                decoration: const InputDecoration(
+                  labelText: 'Department',
+                  prefixIcon: Icon(Icons.business_outlined),
+                ),
+                items: [
+                  const DropdownMenuItem(value: 0, child: Text('None')),
+                  ...departments.map(
+                    (department) => DropdownMenuItem(
+                      value: department.id,
+                      child: Text(department.name),
+                    ),
+                  ),
+                ],
+                onChanged: isLoading
+                    ? null
+                    : (value) {
+                        onDepartmentChanged(value == 0 ? null : value);
+                      },
+              ),
+              if (isCreateMode) ...[
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: passwordController,
+                  enabled: !isLoading,
+                  obscureText: obscureTemporaryPassword,
+                  decoration: InputDecoration(
+                    labelText: 'Temporary password',
+                    prefixIcon: const Icon(Icons.password_outlined),
+                    suffixIcon: IconButton(
+                      tooltip: obscureTemporaryPassword
+                          ? 'Show password'
+                          : 'Hide password',
+                      onPressed: onToggleTemporaryPasswordVisibility,
+                      icon: Icon(
+                        obscureTemporaryPassword
+                            ? Icons.visibility_outlined
+                            : Icons.visibility_off_outlined,
+                      ),
+                    ),
+                  ),
+                  validator: (value) => value == null || value.length < 8
+                      ? 'Temporary password must contain at least 8 characters.'
+                      : null,
+                ),
+              ],
+              if (errorMessage != null) ...[
+                const SizedBox(height: 12),
+                Text(
+                  errorMessage!,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
+              ],
+              const SizedBox(height: 20),
+              FilledButton.icon(
+                onPressed: isLoading ? null : onSubmit,
+                icon: isLoading
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.save),
+                label: Text(isCreateMode ? 'Create user' : 'Save changes'),
               ),
             ],
-            onChanged: isLoading
-                ? null
-                : (value) {
-                    onDepartmentChanged(value == 0 ? null : value);
-                  },
           ),
-          if (isCreateMode) ...[
-            const SizedBox(height: 12),
-            TextField(
-              controller: passwordController,
-              enabled: !isLoading,
-              obscureText: obscureTemporaryPassword,
-              decoration: InputDecoration(
-                labelText: 'Temporary password',
-                border: const OutlineInputBorder(),
-                suffixIcon: IconButton(
-                  tooltip: obscureTemporaryPassword
-                      ? 'Show password'
-                      : 'Hide password',
-                  onPressed: onToggleTemporaryPasswordVisibility,
-                  icon: Icon(
-                    obscureTemporaryPassword
-                        ? Icons.visibility_outlined
-                        : Icons.visibility_off_outlined,
-                  ),
-                ),
-              ),
-            ),
-          ],
-          if (errorMessage != null) ...[
-            const SizedBox(height: 12),
-            Text(
-              errorMessage!,
-              style: TextStyle(color: Theme.of(context).colorScheme.error),
-            ),
-          ],
-          const SizedBox(height: 20),
-          FilledButton.icon(
-            onPressed: isLoading ? null : onSubmit,
-            icon: isLoading
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.save),
-            label: Text(isCreateMode ? 'Create user' : 'Save changes'),
-          ),
-        ],
+        ),
       ),
     );
   }

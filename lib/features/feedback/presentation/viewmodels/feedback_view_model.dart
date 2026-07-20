@@ -19,13 +19,16 @@ class FeedbackViewModel extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   Feedback? get feedback => _feedback;
-  List<Feedback> get userFeedbacks => _userFeedbacks;
+  List<Feedback> get userFeedbacks => List.unmodifiable(_userFeedbacks);
   int get rating => _rating;
   String get comment => _comment;
 
   Future<void> loadFeedbackByTicketId(int ticketId) async {
     _isLoading = true;
     _errorMessage = null;
+    _feedback = null;
+    _rating = 0;
+    _comment = '';
     _safeNotifyListeners();
 
     try {
@@ -36,6 +39,7 @@ class FeedbackViewModel extends ChangeNotifier {
         _comment = feedback.comment ?? '';
       }
     } catch (e) {
+      _feedback = null;
       _errorMessage = 'Failed to load feedback: $e';
     } finally {
       _isLoading = false;
@@ -46,11 +50,13 @@ class FeedbackViewModel extends ChangeNotifier {
   Future<void> loadFeedbackByUserId(int userId) async {
     _isLoading = true;
     _errorMessage = null;
+    _userFeedbacks = [];
     _safeNotifyListeners();
 
     try {
       _userFeedbacks = await _service.getFeedbackByUserId(userId);
     } catch (e) {
+      _userFeedbacks = [];
       _errorMessage = 'Failed to load feedback: $e';
     } finally {
       _isLoading = false;
@@ -131,7 +137,8 @@ class FeedbackViewModel extends ChangeNotifier {
     try {
       await _service.deleteFeedback(id);
       _feedback = null;
-      resetForm();
+      _rating = 0;
+      _comment = '';
       return true;
     } catch (e) {
       _errorMessage = 'Failed to delete feedback: $e';

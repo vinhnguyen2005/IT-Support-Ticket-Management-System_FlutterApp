@@ -1,6 +1,7 @@
 import 'package:sqflite/sqflite.dart';
 
 import '../../../../core/database/app_database.dart';
+import '../../../../core/database/sla_persistence.dart';
 import '../../../../core/enums/ticket_status.dart';
 import '../../../../core/errors/exceptions.dart';
 import '../dtos/assignment_dto.dart';
@@ -14,6 +15,7 @@ class AssignmentLocalDataSourceImpl implements IAssignmentLocalDataSource {
 
   @override
   Future<List<AssignmentDto>> getAssignmentsForStaff(int staffId) async {
+    await SlaPersistence.refreshBreaches(_database);
     final rows = await _database.rawQuery(
       '''
       SELECT
@@ -33,6 +35,11 @@ class AssignmentLocalDataSourceImpl implements IAssignmentLocalDataSource {
         t.status AS status,
         t.createdAt AS ticketCreatedAt,
         t.updatedAt AS ticketUpdatedAt,
+        t.firstRespondedAt AS firstRespondedAt,
+        t.responseDueAt AS responseDueAt,
+        t.resolutionDueAt AS resolutionDueAt,
+        t.slaCompletedAt AS slaCompletedAt,
+        t.slaExceptionReason AS slaExceptionReason,
         pu.message AS lastProgressMessage
       FROM ${AppDatabase.ticketAssignmentsTable} a
       INNER JOIN ${AppDatabase.ticketsTable} t ON t.id = a.ticketId
@@ -45,6 +52,14 @@ class AssignmentLocalDataSourceImpl implements IAssignmentLocalDataSource {
       )
       WHERE a.staffId = ? AND a.isActive = 1
       ORDER BY
+        CASE
+          WHEN t.resolutionDueAt IS NOT NULL
+            AND t.resolvedAt IS NULL
+            AND t.slaExceptionReason IS NULL
+            AND julianday(t.resolutionDueAt) <= julianday('now') THEN 0
+          ELSE 1
+        END,
+        t.resolutionDueAt ASC,
         CASE LOWER(t.priority)
           WHEN 'critical' THEN 1
           WHEN 'high' THEN 2
@@ -65,6 +80,7 @@ class AssignmentLocalDataSourceImpl implements IAssignmentLocalDataSource {
     required int ticketId,
     required int staffId,
   }) async {
+    await SlaPersistence.refreshBreaches(_database);
     final rows = await _database.rawQuery(
       '''
       SELECT
@@ -84,6 +100,11 @@ class AssignmentLocalDataSourceImpl implements IAssignmentLocalDataSource {
         t.status AS status,
         t.createdAt AS ticketCreatedAt,
         t.updatedAt AS ticketUpdatedAt,
+        t.firstRespondedAt AS firstRespondedAt,
+        t.responseDueAt AS responseDueAt,
+        t.resolutionDueAt AS resolutionDueAt,
+        t.slaCompletedAt AS slaCompletedAt,
+        t.slaExceptionReason AS slaExceptionReason,
         pu.message AS lastProgressMessage
       FROM ${AppDatabase.ticketAssignmentsTable} a
       INNER JOIN ${AppDatabase.ticketsTable} t ON t.id = a.ticketId
@@ -129,7 +150,7 @@ class AssignmentLocalDataSourceImpl implements IAssignmentLocalDataSource {
     await _database.transaction((transaction) async {
       final ticketRows = await transaction.query(
         AppDatabase.ticketsTable,
-        columns: ['id', 'status'],
+        columns: ['id', 'status', 'firstRespondedAt', 'responseDueAt'],
         where: 'id = ?',
         whereArgs: [ticketId],
         limit: 1,
@@ -181,6 +202,8 @@ class AssignmentLocalDataSourceImpl implements IAssignmentLocalDataSource {
           'assignedStaffId': staffId,
           'status': TicketStatus.assigned.value,
           'updatedAt': now,
+          if (ticketRows.first['firstRespondedAt'] == null)
+            'firstRespondedAt': now,
         },
         where: 'id = ?',
         whereArgs: [ticketId],
@@ -194,6 +217,40 @@ class AssignmentLocalDataSourceImpl implements IAssignmentLocalDataSource {
         'note': note ?? 'Ticket assigned',
         'changedAt': now,
       });
+
+      if (ticketRows.first['firstRespondedAt'] == null) {
+        final responseDueAt = DateTime.tryParse(
+          ticketRows.first['responseDueAt'] as String? ?? '',
+        );
+        final respondedLate =
+            responseDueAt != null && DateTime.parse(now).isAfter(responseDueAt);
+        if (respondedLate) {
+          final existingBreachEvents = await transaction.query(
+            AppDatabase.slaEventsTable,
+            columns: ['id'],
+            where: 'ticketId = ? AND eventType = ?',
+            whereArgs: [ticketId, 'ResponseBreached'],
+            limit: 1,
+          );
+          if (existingBreachEvents.isEmpty) {
+            await transaction.insert(AppDatabase.slaEventsTable, {
+              'ticketId': ticketId,
+              'eventType': 'ResponseBreached',
+              'newDueAt': ticketRows.first['responseDueAt'],
+              'createdByUserId': assignedByUserId,
+              'createdAt': now,
+            });
+          }
+        }
+        await transaction.insert(AppDatabase.slaEventsTable, {
+          'ticketId': ticketId,
+          'eventType': respondedLate ? 'RespondedLate' : 'Responded',
+          'newDueAt': ticketRows.first['responseDueAt'],
+          'reason': note,
+          'createdByUserId': assignedByUserId,
+          'createdAt': now,
+        });
+      }
     });
   }
 
@@ -228,7 +285,7 @@ class AssignmentLocalDataSourceImpl implements IAssignmentLocalDataSource {
 
       final ticketRows = await transaction.query(
         AppDatabase.ticketsTable,
-        columns: ['status'],
+        columns: ['status', 'resolutionDueAt'],
         where: 'id = ?',
         whereArgs: [ticketId],
         limit: 1,
@@ -245,13 +302,23 @@ class AssignmentLocalDataSourceImpl implements IAssignmentLocalDataSource {
         throw AppException('Unsupported ticket status: $status.');
       }
 
+      final resolutionDueAt = DateTime.tryParse(
+        ticketRows.first['resolutionDueAt'] as String? ?? '',
+      );
+      final breached =
+          parsedStatus == TicketStatus.resolved &&
+          resolutionDueAt != null &&
+          DateTime.parse(now).isAfter(resolutionDueAt);
+
       await transaction.update(
         AppDatabase.ticketsTable,
         {
           'status': parsedStatus.value,
           'updatedAt': now,
-          if (parsedStatus == TicketStatus.closed) 'resolvedAt': now,
-          if (parsedStatus == TicketStatus.closed)
+          if (parsedStatus == TicketStatus.resolved) 'resolvedAt': now,
+          if (parsedStatus == TicketStatus.resolved) 'slaCompletedAt': now,
+          if (breached) 'slaBreachedAt': now,
+          if (parsedStatus == TicketStatus.resolved)
             'solutionSummary': solutionSummary,
           if (parsedStatus == TicketStatus.closed) 'closedAt': now,
           if (parsedStatus != TicketStatus.closed) 'closedAt': null,
@@ -268,6 +335,17 @@ class AssignmentLocalDataSourceImpl implements IAssignmentLocalDataSource {
         'note': note,
         'changedAt': now,
       });
+
+      if (parsedStatus == TicketStatus.resolved) {
+        await transaction.insert(AppDatabase.slaEventsTable, {
+          'ticketId': ticketId,
+          'eventType': breached ? 'BreachedResolved' : 'Completed',
+          'newDueAt': ticketRows.first['resolutionDueAt'],
+          'reason': solutionSummary ?? note,
+          'createdByUserId': staffId,
+          'createdAt': now,
+        });
+      }
     });
   }
 }
