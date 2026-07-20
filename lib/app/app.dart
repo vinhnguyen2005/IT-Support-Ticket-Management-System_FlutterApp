@@ -7,6 +7,7 @@ import '../features/auth/presentation/viewmodels/login_view_model.dart';
 import '../features/auth/presentation/views/change_password_page.dart';
 import '../features/auth/presentation/views/home_page.dart';
 import '../features/auth/presentation/views/login_page.dart';
+import 'routes/app_routes.dart';
 
 class App extends StatefulWidget {
   const App({super.key});
@@ -26,15 +27,21 @@ class _AppState extends State<App> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = ThemeData(
+      colorScheme: ColorScheme.fromSeed(seedColor: Colors.indigo),
+      useMaterial3: true,
+    );
+
     return FutureBuilder<LoginViewModel>(
       future: _loginViewModelFuture,
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
           return MaterialApp(
-            theme: AppTheme.light,
-            darkTheme: AppTheme.dark,
-            themeMode: ThemeMode.system,
-            home: Scaffold(body: Center(child: CircularProgressIndicator())),
+            debugShowCheckedModeBanner: false,
+            theme: theme,
+            home: const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            ),
           );
         }
 
@@ -43,9 +50,11 @@ class _AppState extends State<App> {
         return MaterialApp(
           title: AppStrings.appName,
           debugShowCheckedModeBanner: false,
-          theme: AppTheme.light,
-          darkTheme: AppTheme.dark,
-          themeMode: ThemeMode.system,
+          theme: theme,
+          onGenerateRoute: (settings) => AppRoutes.onGenerateRoute(
+            settings,
+            loginViewModel: loginViewModel,
+          ),
           home: currentUser == null
               ? LoginPage(viewModel: loginViewModel)
               : currentUser.mustChangePassword
