@@ -11,7 +11,7 @@ class AppDatabase {
   AppDatabase._();
 
   static const String databaseName = 'it_support.db';
-  static const int databaseVersion = 14;
+  static const int databaseVersion = 15;
 
   static const String usersTable = 'users';
   static const String authSessionTable = 'auth_session';
@@ -1014,6 +1014,391 @@ class AppDatabase {
           createdAt: now,
         );
       }
+
+      await _seedEndToEndFlowData(transaction, DateTime.parse(now));
+    });
+  }
+
+  /// Seeds a small, connected scenario for every meaningful ticket state.
+  /// Stable usernames and `[Seed]` titles make this safe to run repeatedly.
+  static Future<void> _seedEndToEndFlowData(
+    Transaction transaction,
+    DateTime now,
+  ) async {
+    Future<int?> id(String table, String column, Object value) =>
+        _findSeedRowId(transaction, table, column, value);
+
+    final departmentId = await id(departmentsTable, 'name', 'IT Support');
+    final networkDepartmentId = await id(departmentsTable, 'name', 'Network');
+    final softwareCategoryId = await id(
+      categoriesTable,
+      'name',
+      'Software Issue',
+    );
+    final networkCategoryId = await id(
+      categoriesTable,
+      'name',
+      'Network Issue',
+    );
+    final lowPriorityId = await id(prioritiesTable, 'name', 'Low');
+    final mediumPriorityId = await id(prioritiesTable, 'name', 'Medium');
+    final highPriorityId = await id(prioritiesTable, 'name', 'High');
+    final adminId = await id(usersTable, 'username', 'admin');
+    final primaryStaffId = await id(usersTable, 'username', 'staff');
+    final employeeId = await id(usersTable, 'username', 'employee');
+    if (departmentId == null ||
+        adminId == null ||
+        primaryStaffId == null ||
+        employeeId == null) {
+      return;
+    }
+
+    await _insertSeedUserIfAbsent(
+      transaction,
+      fullName: 'Network Technician',
+      username: 'network.tech',
+      email: 'network.tech@example.com',
+      role: 'staff',
+      departmentId: networkDepartmentId ?? departmentId,
+      now: now,
+    );
+    await _insertSeedUserIfAbsent(
+      transaction,
+      fullName: 'Alex Morgan',
+      username: 'alex.employee',
+      email: 'alex.employee@example.com',
+      role: 'user',
+      departmentId: departmentId,
+      now: now,
+    );
+    final secondEmployeeId = await id(usersTable, 'username', 'alex.employee');
+
+    final scenarios = <Map<String, Object?>>[
+      {
+        'title': '[Seed] New starter needs software access',
+        'description':
+            'Provision access to the approved design and collaboration tools.',
+        'issueType': IssueType.software.value,
+        'priority': PriorityLevel.low.value,
+        'status': TicketStatus.submitted.value,
+        'creator': secondEmployeeId ?? employeeId,
+        'staff': null,
+        'category': softwareCategoryId,
+        'priorityId': lowPriorityId,
+        'department': departmentId,
+        'ageHours': 2,
+      },
+      {
+        'title': '[Seed] Wi-Fi drops in meeting room',
+        'description': 'Meeting-room devices disconnect every few minutes.',
+        'issueType': IssueType.network.value,
+        'priority': PriorityLevel.medium.value,
+        'status': TicketStatus.assigned.value,
+        'creator': employeeId,
+        'staff': primaryStaffId,
+        'category': networkCategoryId,
+        'priorityId': mediumPriorityId,
+        'department': networkDepartmentId ?? departmentId,
+        'ageHours': 6,
+      },
+      {
+        'title': '[Seed] Finance application crashes on export',
+        'description':
+            'The desktop client closes while exporting the monthly report.',
+        'issueType': IssueType.software.value,
+        'priority': PriorityLevel.high.value,
+        'status': TicketStatus.processing.value,
+        'creator': employeeId,
+        'staff': primaryStaffId,
+        'category': softwareCategoryId,
+        'priorityId': highPriorityId,
+        'department': departmentId,
+        'ageHours': 10,
+      },
+      {
+        'title': '[Seed] Shared drive mapping restored',
+        'description':
+            'The department shared drive disappeared after a password reset.',
+        'issueType': IssueType.network.value,
+        'priority': PriorityLevel.medium.value,
+        'status': TicketStatus.resolved.value,
+        'creator': secondEmployeeId ?? employeeId,
+        'staff': primaryStaffId,
+        'category': networkCategoryId,
+        'priorityId': mediumPriorityId,
+        'department': networkDepartmentId ?? departmentId,
+        'ageHours': 30,
+      },
+      {
+        'title': '[Seed] Email signature deployment completed',
+        'description': 'Deploy the standard signature to the sales team.',
+        'issueType': IssueType.software.value,
+        'priority': PriorityLevel.low.value,
+        'status': TicketStatus.closed.value,
+        'creator': employeeId,
+        'staff': primaryStaffId,
+        'category': softwareCategoryId,
+        'priorityId': lowPriorityId,
+        'department': departmentId,
+        'ageHours': 96,
+      },
+      {
+        'title': '[Seed] Duplicate monitor request cancelled',
+        'description': 'Request was submitted twice and no work is required.',
+        'issueType': IssueType.hardware.value,
+        'priority': PriorityLevel.low.value,
+        'status': TicketStatus.cancelled.value,
+        'creator': employeeId,
+        'staff': null,
+        'category': softwareCategoryId,
+        'priorityId': lowPriorityId,
+        'department': departmentId,
+        'ageHours': 18,
+      },
+    ];
+
+    for (final scenario in scenarios) {
+      final created = now.subtract(
+        Duration(hours: scenario['ageHours']! as int),
+      );
+      final ticketId = await _upsertFlowTicket(
+        transaction,
+        scenario,
+        created,
+        now,
+      );
+      final staffId = scenario['staff'] as int?;
+      final status = scenario['status']! as String;
+      if (staffId != null) {
+        await _insertSeedAssignmentIfAbsent(
+          transaction,
+          ticketId: ticketId,
+          staffId: staffId,
+          assignedByUserId: adminId,
+          note: 'Assigned as part of the end-to-end demo scenario.',
+          createdAt: created.add(const Duration(minutes: 30)).toIso8601String(),
+        );
+      }
+      await _insertSeedStatusHistoryIfAbsent(
+        transaction,
+        ticketId: ticketId,
+        changedByUserId: employeeId,
+        fromStatus: null,
+        toStatus: TicketStatus.submitted.value,
+        note: 'Ticket submitted.',
+        changedAt: created,
+      );
+      if (status != TicketStatus.submitted.value) {
+        await _insertSeedStatusHistoryIfAbsent(
+          transaction,
+          ticketId: ticketId,
+          changedByUserId: status == TicketStatus.cancelled.value
+              ? employeeId
+              : adminId,
+          fromStatus: TicketStatus.submitted.value,
+          toStatus: status,
+          note: 'Seeded lifecycle transition.',
+          changedAt: created.add(const Duration(hours: 1)),
+        );
+      }
+      if (status == TicketStatus.processing.value) {
+        await _insertSeedProgressUpdateIfAbsent(
+          transaction,
+          ticketId: ticketId,
+          staffId: staffId!,
+          message: 'Reproduced the issue and collected diagnostic logs.',
+          createdAt: created.add(const Duration(hours: 2)).toIso8601String(),
+        );
+        await _insertSeedCommentIfAbsent(
+          transaction,
+          ticketId,
+          employeeId,
+          'The crash also occurs with a smaller export.',
+          created.add(const Duration(hours: 3)),
+        );
+      }
+      if (status == TicketStatus.resolved.value ||
+          status == TicketStatus.closed.value) {
+        await _insertSeedCommentIfAbsent(
+          transaction,
+          ticketId,
+          staffId!,
+          'Fix applied and validation completed successfully.',
+          created.add(const Duration(hours: 4)),
+        );
+      }
+      if (status == TicketStatus.closed.value) {
+        await _insertSeedFeedbackIfAbsent(
+          transaction,
+          ticketId,
+          employeeId,
+          staffId!,
+          now,
+        );
+      }
+    }
+  }
+
+  static Future<void> _insertSeedUserIfAbsent(
+    Transaction transaction, {
+    required String fullName,
+    required String username,
+    required String email,
+    required String role,
+    required int departmentId,
+    required DateTime now,
+  }) async {
+    await transaction.insert(usersTable, {
+      'fullName': fullName,
+      'username': username,
+      'email': email,
+      'passwordHash': PasswordHasher.hash('Demo@123'),
+      'role': role,
+      'departmentId': departmentId,
+      'isActive': 1,
+      'mustChangePassword': 0,
+      'failedLoginAttempts': 0,
+      'createdAt': now.toIso8601String(),
+    }, conflictAlgorithm: ConflictAlgorithm.ignore);
+  }
+
+  static Future<int> _upsertFlowTicket(
+    Transaction transaction,
+    Map<String, Object?> scenario,
+    DateTime created,
+    DateTime now,
+  ) async {
+    final title = scenario['title']! as String;
+    final priority = scenario['priority']! as String;
+    final status = scenario['status']! as String;
+    final responded = scenario['staff'] == null
+        ? null
+        : created.add(const Duration(minutes: 30));
+    final completed =
+        status == TicketStatus.resolved.value ||
+            status == TicketStatus.closed.value
+        ? created.add(const Duration(hours: 5))
+        : null;
+    final values = <String, Object?>{
+      'title': title,
+      'description': scenario['description'],
+      'issueType': scenario['issueType'],
+      'priority': priority,
+      'status': status,
+      'createdByUserId': scenario['creator'],
+      'assignedStaffId': scenario['staff'],
+      'categoryId': scenario['category'],
+      'priorityId': scenario['priorityId'],
+      'departmentId': scenario['department'],
+      'solutionSummary': completed == null
+          ? null
+          : 'Configuration corrected and verified with the requester.',
+      'firstRespondedAt': responded?.toIso8601String(),
+      'responseDueAt': created
+          .add(Duration(hours: _defaultResponseSlaHours(priority)))
+          .toIso8601String(),
+      'resolutionDueAt': created
+          .add(Duration(hours: _defaultResolutionSlaHours(priority)))
+          .toIso8601String(),
+      'resolvedAt': completed?.toIso8601String(),
+      'closedAt': status == TicketStatus.closed.value
+          ? completed?.add(const Duration(hours: 2)).toIso8601String()
+          : null,
+      'slaCompletedAt': completed?.toIso8601String(),
+      'updatedAt': now.toIso8601String(),
+    };
+    final existingId = await _findSeedRowId(
+      transaction,
+      ticketsTable,
+      'title',
+      title,
+    );
+    if (existingId != null) {
+      await transaction.update(
+        ticketsTable,
+        values,
+        where: 'id = ?',
+        whereArgs: [existingId],
+      );
+      return existingId;
+    }
+    values['createdAt'] = created.toIso8601String();
+    return transaction.insert(ticketsTable, values);
+  }
+
+  static Future<void> _insertSeedStatusHistoryIfAbsent(
+    Transaction transaction, {
+    required int ticketId,
+    required int changedByUserId,
+    required String? fromStatus,
+    required String toStatus,
+    required String note,
+    required DateTime changedAt,
+  }) async {
+    final rows = await transaction.query(
+      ticketStatusHistoriesTable,
+      columns: ['id'],
+      where: 'ticketId = ? AND toStatus = ?',
+      whereArgs: [ticketId, toStatus],
+      limit: 1,
+    );
+    if (rows.isNotEmpty) return;
+    await transaction.insert(ticketStatusHistoriesTable, {
+      'ticketId': ticketId,
+      'changedByUserId': changedByUserId,
+      'fromStatus': fromStatus,
+      'toStatus': toStatus,
+      'note': note,
+      'changedAt': changedAt.toIso8601String(),
+    });
+  }
+
+  static Future<void> _insertSeedCommentIfAbsent(
+    Transaction transaction,
+    int ticketId,
+    int authorId,
+    String content,
+    DateTime createdAt,
+  ) async {
+    final rows = await transaction.query(
+      ticketCommentsTable,
+      columns: ['id'],
+      where: 'ticketId = ? AND content = ?',
+      whereArgs: [ticketId, content],
+      limit: 1,
+    );
+    if (rows.isNotEmpty) return;
+    await transaction.insert(ticketCommentsTable, {
+      'ticketId': ticketId,
+      'authorId': authorId,
+      'content': content,
+      'createdAt': createdAt.toIso8601String(),
+    });
+  }
+
+  static Future<void> _insertSeedFeedbackIfAbsent(
+    Transaction transaction,
+    int ticketId,
+    int reviewerId,
+    int revieweeId,
+    DateTime createdAt,
+  ) async {
+    final rows = await transaction.query(
+      feedbackTable,
+      columns: ['id'],
+      where: 'ticketId = ?',
+      whereArgs: [ticketId],
+      limit: 1,
+    );
+    if (rows.isNotEmpty) return;
+    await transaction.insert(feedbackTable, {
+      'ticketId': ticketId,
+      'reviewerUserId': reviewerId,
+      'revieweeUserId': revieweeId,
+      'staffRating': 5,
+      'supportRating': 4,
+      'comment': 'Clear communication and a successful resolution.',
+      'createdAt': createdAt.toIso8601String(),
     });
   }
 
